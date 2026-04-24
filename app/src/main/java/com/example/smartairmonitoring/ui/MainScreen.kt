@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -23,10 +24,15 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.smartairmonitoring.modul.core.navigation.Screen
 import com.example.smartairmonitoring.ui.home.HomeScreen
+import com.example.smartairmonitoring.ui.home.HomeViewModel
+import com.example.smartairmonitoring.ui.profile.ProfileScreen
+import com.example.smartairmonitoring.ui.profile.ProfileViewModel
 import com.example.smartairmonitoring.ui.theme.*
 
 @Composable
-fun MainScreen() {
+fun MainScreen(
+    onLogout: () -> Unit
+) {
     val navController = rememberNavController()
     
     val items = listOf(
@@ -67,9 +73,9 @@ fun MainScreen() {
                             }
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFFEF4444),
+                            selectedIconColor = AIAccent,
                             unselectedIconColor = TextSecondary,
-                            selectedTextColor = Color(0xFFEF4444),
+                            selectedTextColor = AIAccent,
                             unselectedTextColor = TextSecondary,
                             indicatorColor = Color.Transparent
                         )
@@ -83,11 +89,21 @@ fun MainScreen() {
             startDestination = Screen.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Home.route) { HomeScreen() }
+            composable(Screen.Home.route) { 
+                val homeViewModel: HomeViewModel = viewModel()
+                HomeScreen(homeViewModel) 
+            }
             composable(Screen.Map.route) { PlaceholderScreen("Map Screen") }
             composable(Screen.Forecast.route) { PlaceholderScreen("Forecast Screen") }
             composable(Screen.AIAssistant.route) { PlaceholderScreen("AI Assistant Screen") }
-            composable(Screen.Profile.route) { PlaceholderScreen("Profile Screen") }
+            composable(Screen.Profile.route) { 
+                val profileViewModel: ProfileViewModel = viewModel()
+                ProfileScreen(
+                    viewModel = profileViewModel,
+                    onBackClick = { navController.popBackStack() },
+                    onLogout = onLogout
+                ) 
+            }
         }
     }
 }

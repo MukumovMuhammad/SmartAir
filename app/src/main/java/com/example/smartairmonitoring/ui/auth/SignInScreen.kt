@@ -1,5 +1,6 @@
 package com.example.smartairmonitoring.ui.auth
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,12 +23,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,14 +38,27 @@ import com.example.smartairmonitoring.ui.theme.*
 
 @Composable
 fun SignInScreen(
+    viewModel: AuthViewModel,
     onBackClick: () -> Unit,
-    onLoginClick: () -> Unit,
+    onSuccess: () -> Unit,
     onSignUpClick: () -> Unit,
     onForgotPasswordClick: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+
+    val authState by viewModel.authState.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(authState) {
+        if (authState is AuthState.Success) {
+            onSuccess()
+            viewModel.resetState()
+        } else if (authState is AuthState.Error) {
+            Toast.makeText(context, (authState as AuthState.Error).message, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Background Image
@@ -160,10 +173,14 @@ fun SignInScreen(
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            PrimaryGradientButton(
-                text = "Login",
-                onClick = onLoginClick
-            )
+            if (authState is AuthState.Loading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally), color = AIAccent)
+            } else {
+                PrimaryGradientButton(
+                    text = "Login",
+                    onClick = { viewModel.signIn(email, password) }
+                )
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 

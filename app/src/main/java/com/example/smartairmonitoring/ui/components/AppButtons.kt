@@ -87,3 +87,34 @@ fun SecondaryOutlineButton(
         )
     }
 }
+
+@Composable
+fun GoogleSignInButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    text: String = "Continue with Google"
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(56.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color.White.copy(alpha = 0.05f),
+            contentColor = TextPrimary
+        ),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF374151))
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Placeholder for Google Icon if you add it later:
+            // Icon(painter = painterResource(R.drawable.ic_google), contentDescription = null, modifier = Modifier.size(24.dp))
+            // Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = text,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}

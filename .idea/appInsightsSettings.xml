@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.example.smartairmonitoring" />
+                  <option name="mobileSdkAppId" value="1:1042176330893:android:7dba15673a39374418e6c4" />
+                  <option name="projectId" value="smart-air-b112f" />
+                  <option name="projectNumber" value="1042176330893" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />
