@@ -91,7 +91,9 @@ fun MainScreen(
         ) {
             composable(Screen.Home.route) { 
                 val homeViewModel: HomeViewModel = viewModel()
-                HomeScreen(homeViewModel) 
+                HomeScreen(homeViewModel){
+                    onLogout()
+                }
             }
             composable(Screen.Map.route) { PlaceholderScreen("Map Screen") }
             composable(Screen.Forecast.route) { PlaceholderScreen("Forecast Screen") }

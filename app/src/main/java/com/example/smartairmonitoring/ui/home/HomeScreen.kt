@@ -27,10 +27,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartairmonitoring.R
+import com.example.smartairmonitoring.ui.components.PrimaryGradientButton
 import com.example.smartairmonitoring.ui.theme.*
 
 @Composable
-fun HomeScreen(viewModel: HomeViewModel) {
+fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
     val homeState by viewModel.homeState.collectAsState()
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -71,6 +72,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                 AQIGauge(aqi = 165, status = "Unhealthy", subStatus = "for Sensitive Groups")
                 
                 Spacer(modifier = Modifier.height(32.dp))
+                PrimaryGradientButton("Log out", onClick = { logout })
                 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

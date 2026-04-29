@@ -1,6 +1,7 @@
 package com.example.smartairmonitoring.ui.auth
 
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -64,8 +65,9 @@ fun SignUpScreen(
 
     LaunchedEffect(authState) {
         if (authState is AuthState.Success) {
+            Log.i(TAG, "Success")
             onSuccess()
-            viewModel.resetState()
+//            viewModel.resetState()
         } else if (authState is AuthState.Error) {
             Toast.makeText(context, (authState as AuthState.Error).message, Toast.LENGTH_SHORT).show()
         }
@@ -158,23 +160,21 @@ fun SignUpScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                AppTextField(
-                    value = firstName,
-                    onValueChange = { firstName = it },
-                    label = "First Name",
-                    placeholder = "First name",
-                    modifier = Modifier.weight(1f),
-                    leadingIcon = Icons.Default.Person
-                )
-                AppTextField(
-                    value = surname,
-                    onValueChange = { surname = it },
-                    label = "Surname",
-                    placeholder = "Surname",
-                    modifier = Modifier.weight(1f)
-                )
-            }
+            AppTextField(
+                value = firstName,
+                onValueChange = { firstName = it },
+                label = "First Name",
+                placeholder = "First name",
+                modifier = Modifier.weight(1f),
+                leadingIcon = Icons.Default.Person
+            )
+            AppTextField(
+                value = surname,
+                onValueChange = { surname = it },
+                label = "Surname",
+                placeholder = "Surname",
+                modifier = Modifier.weight(1f)
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 

@@ -6,11 +6,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.smartairmonitoring.ui.MainScreen
-import com.example.smartairmonitoring.ui.auth.AuthViewModel
-import com.example.smartairmonitoring.ui.auth.SignInScreen
-import com.example.smartairmonitoring.ui.auth.SignUpScreen
-import com.example.smartairmonitoring.ui.auth.SuccessScreen
-import com.example.smartairmonitoring.ui.auth.WelcomeScreen
+import com.example.smartairmonitoring.ui.auth.*
 import com.google.firebase.auth.FirebaseAuth
 
 @Composable
@@ -49,8 +45,18 @@ fun AppNavigation() {
             SignUpScreen(
                 viewModel = authViewModel,
                 onBackClick = { navController.popBackStack() },
-                onSuccess = { navController.navigate("success_screen") },
+                onSuccess = { navController.navigate(Screen.CompleteProfile.route) },
                 onLoginClick = { navController.navigate(Screen.SignIn.route) }
+            )
+        }
+        composable(Screen.CompleteProfile.route) {
+            CompleteProfileScreen(
+                viewModel = authViewModel,
+                onSuccess = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Welcome.route) { inclusive = true }
+                    }
+                }
             )
         }
         composable("success_screen") {
@@ -63,6 +69,7 @@ fun AppNavigation() {
                 }
             )
         }
+
         composable(Screen.Home.route) {
             MainScreen(){
                 // Handle logout
