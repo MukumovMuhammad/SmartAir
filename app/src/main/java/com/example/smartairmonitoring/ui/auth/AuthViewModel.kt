@@ -39,31 +39,39 @@ class AuthViewModel : ViewModel() {
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState = _authState.asStateFlow()
 
-    fun signUp(firstName: String, surname: String, email: String, password: String) {
+    init {
+        checkCurrentUser()
+    }
+
+    private fun checkCurrentUser() {
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            viewModelScope.launch {
+                checkProfileCompletion(currentUser.uid)
+            }
+        }
+    }
+
+    fun signUp(email: String, password: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             try {
                 val result = auth.createUserWithEmailAndPassword(email, password).await()
-                Log.e(TAG, "result: ${result.user}")
                 val firebaseUser = result.user
                 
                 if (firebaseUser != null) {
                     val user = User(
                         uid = firebaseUser.uid,
-                        firstName = firstName,
-                        surname = surname,
-                        email = email
+                        email = email,
+                        firstName = "", // Empty to trigger completion check
+                        surname = ""
                     )
 
-                    Log.e(TAG, "user: $user")
-                    // Use document(uid).set() instead of add() to match typical security rules
-                    // and use consistent collection naming "users"
                     db.collection("users")
                         .document(firebaseUser.uid)
                         .set(user)
                         .await()
                     
-                    Log.i(TAG, "User profile created in Firestore for UID: ${firebaseUser.uid}")
                     _authState.value = AuthState.NeedsProfileCompletion
                 } else {
                     _authState.value = AuthState.Error("Registration failed: User is null")
@@ -79,33 +87,51 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             try {
-                auth.signInWithEmailAndPassword(email, password).await()
-                _authState.value = AuthState.Success
+                val result = auth.signInWithEmailAndPassword(email, password).await()
+                val firebaseUser = result.user
+                if (firebaseUser != null) {
+                    checkProfileCompletion(firebaseUser.uid)
+                } else {
+                    _authState.value = AuthState.Error("Login failed: User is null")
+                }
             } catch (e: Exception) {
                 _authState.value = AuthState.Error(e.localizedMessage ?: "Login failed")
             }
         }
     }
 
+    private suspend fun checkProfileCompletion(uid: String) {
+        try {
+            val doc = db.collection("users").document(uid).get().await()
+            if (doc.exists()) {
+                val userObj = doc.toObject(User::class.java)
+                if (userObj?.firstName.isNullOrEmpty() || userObj?.surname.isNullOrEmpty()) {
+                    _authState.value = AuthState.NeedsProfileCompletion
+                } else {
+                    _authState.value = AuthState.Success
+                }
+            } else {
+                // If document doesn't exist for some reason, we need to create it and complete it
+                _authState.value = AuthState.NeedsProfileCompletion
+            }
+        } catch (e: Exception) {
+            _authState.value = AuthState.Error("Failed to check profile status")
+        }
+    }
+
     fun signInWithGoogle(context: Context) {
         val credentialManager = CredentialManager.create(context)
-
         val googleIdOption = GetGoogleIdOption.Builder()
             .setServerClientId(context.getString(R.string.default_web_client_id))
             .build()
-
         val request = GetCredentialRequest.Builder()
             .addCredentialOption(googleIdOption)
             .build()
 
         viewModelScope.launch {
             _authState.value = AuthState.Loading
-
             try {
-                val result = credentialManager.getCredential(
-                    context = context,
-                    request = request
-                )
+                val result = credentialManager.getCredential(context = context, request = request)
                 handleSignInResult(result)
             } catch (e: GetCredentialException) {
                 _authState.value = AuthState.Error(e.message ?: "Credential Manager Error")
@@ -120,7 +146,6 @@ class AuthViewModel : ViewModel() {
         if (credential is GoogleIdTokenCredential) {
             val googleIdToken = credential.idToken
             val firebaseCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
-
             try {
                 val authResult = auth.signInWithCredential(firebaseCredential).await()
                 val firebaseUser = authResult.user
@@ -137,11 +162,16 @@ class AuthViewModel : ViewModel() {
                             profilePicUrl = firebaseUser.photoUrl?.toString()
                         )
                         db.collection("users").document(firebaseUser.uid).set(user).await()
-                        _authState.value = AuthState.NeedsProfileCompletion
+                        
+                        // After creating, check if it's actually complete (Google might not provide all info)
+                        if (user.firstName.isEmpty() || user.surname.isEmpty()) {
+                            _authState.value = AuthState.NeedsProfileCompletion
+                        } else {
+                             _authState.value = AuthState.Success
+                        }
                     } else {
-                        // Check if optional fields are missing
                         val userObj = doc.toObject(User::class.java)
-                        if (userObj?.firstName.isNullOrEmpty() || userObj?.ageGroup == "18 - 24") { // Or some logic to detect new users
+                        if (userObj?.firstName.isNullOrEmpty() || userObj?.surname.isNullOrEmpty()) {
                              _authState.value = AuthState.NeedsProfileCompletion
                         } else {
                              _authState.value = AuthState.Success
@@ -169,7 +199,6 @@ class AuthViewModel : ViewModel() {
                 )
                 db.collection("users").document(uid).update(updates).await()
                 
-                // Update Firebase Auth display name too
                 val profileUpdates = UserProfileChangeRequest.Builder()
                     .setDisplayName("$firstName $surname")
                     .build()
@@ -188,7 +217,6 @@ class AuthViewModel : ViewModel() {
 
     fun logout() {
         auth.signOut()
+        _authState.value = AuthState.Idle
     }
-
-
 }

@@ -53,13 +53,13 @@ fun AppNavigation() {
             CompleteProfileScreen(
                 viewModel = authViewModel,
                 onSuccess = {
-                    navController.navigate(Screen.Home.route) {
+                    navController.navigate(Screen.Success.route) {
                         popUpTo(Screen.Welcome.route) { inclusive = true }
                     }
                 }
             )
         }
-        composable("success_screen") {
+        composable(Screen.Success.route) {
             SuccessScreen(
                 onBackClick = { navController.popBackStack() },
                 onLetGetStartedClick = { 

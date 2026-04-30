@@ -72,8 +72,6 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                 AQIGauge(aqi = 165, status = "Unhealthy", subStatus = "for Sensitive Groups")
                 
                 Spacer(modifier = Modifier.height(32.dp))
-                PrimaryGradientButton("Log out", onClick = { logout })
-                
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)

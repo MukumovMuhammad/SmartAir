@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -17,27 +16,21 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.credentials.CredentialManager
 
 import com.example.smartairmonitoring.R
 import com.example.smartairmonitoring.ui.components.AppTextField
 import com.example.smartairmonitoring.ui.components.GoogleSignInButton
 import com.example.smartairmonitoring.ui.components.PrimaryGradientButton
 import com.example.smartairmonitoring.ui.theme.*
-
-const val TAG = "SignUpScreen_TAG"
 
 @Composable
 fun SignUpScreen(
@@ -46,28 +39,22 @@ fun SignUpScreen(
     onSuccess: () -> Unit,
     onLoginClick: () -> Unit
 ) {
-    var firstName by remember { mutableStateOf("") }
-    var surname by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
 
     val authState by viewModel.authState.collectAsState()
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val credentialManager = CredentialManager.create(context)
-    val webClientId = stringResource(id = R.string.default_web_client_id)
-    val current =   LocalContext.current
 
-    var EightCharacters by remember { mutableStateOf(false) }
-    var ContainsNumber by remember { mutableStateOf(false) }
-    var ContainsUppercase by remember { mutableStateOf(false) }
+    var eightCharacters by remember { mutableStateOf(false) }
+    var containsNumber by remember { mutableStateOf(false) }
+    var containsUppercase by remember { mutableStateOf(false) }
 
     LaunchedEffect(authState) {
-        if (authState is AuthState.Success) {
-            Log.i(TAG, "Success")
+        if (authState is AuthState.NeedsProfileCompletion) {
             onSuccess()
-//            viewModel.resetState()
+        } else if (authState is AuthState.Success) {
+            onSuccess()
         } else if (authState is AuthState.Error) {
             Toast.makeText(context, (authState as AuthState.Error).message, Toast.LENGTH_SHORT).show()
         }
@@ -112,33 +99,6 @@ fun SignUpScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Profile Add Placeholder
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(BackgroundSecondary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        tint = AIAccent,
-                        modifier = Modifier.size(40.dp)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .size(24.dp)
-                            .background(AQIGood, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
                 Text(
                     text = buildAnnotatedString {
                         append("Create ")
@@ -159,24 +119,6 @@ fun SignUpScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
-
-            AppTextField(
-                value = firstName,
-                onValueChange = { firstName = it },
-                label = "First Name",
-                placeholder = "First name",
-                modifier = Modifier.weight(1f),
-                leadingIcon = Icons.Default.Person
-            )
-            AppTextField(
-                value = surname,
-                onValueChange = { surname = it },
-                label = "Surname",
-                placeholder = "Surname",
-                modifier = Modifier.weight(1f)
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
 
             AppTextField(
                 value = email,
@@ -209,15 +151,15 @@ fun SignUpScreen(
             )
 
             Spacer(modifier = Modifier.height(16.dp))
-            EightCharacters =  password.length >= 8
-            ContainsNumber = password.any { it.isDigit() }
-            ContainsUppercase = password.any { it.isUpperCase() }
+            eightCharacters =  password.length >= 8
+            containsNumber = password.any { it.isDigit() }
+            containsUppercase = password.any { it.isUpperCase() }
 
 
-            // Password requirements (Simple validation check examples)
-            PasswordRequirementItem(text = "At least 8 characters", isMet = EightCharacters)
-            PasswordRequirementItem(text = "Contains a number", isMet = ContainsNumber)
-            PasswordRequirementItem(text = "Contains an uppercase letter", isMet = ContainsUppercase)
+            // Password requirements
+            PasswordRequirementItem(text = "At least 8 characters", isMet = eightCharacters)
+            PasswordRequirementItem(text = "Contains a number", isMet = containsNumber)
+            PasswordRequirementItem(text = "Contains an uppercase letter", isMet = containsUppercase)
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -228,17 +170,15 @@ fun SignUpScreen(
                 PrimaryGradientButton(
                     text = "Create Account",
                     onClick = {
-
-                        if (EightCharacters && ContainsNumber && ContainsUppercase){
+                        if (eightCharacters && containsNumber && containsUppercase){
                             if (password == confirmPassword) {
-                                viewModel.signUp(firstName, surname, email, password)
+                                viewModel.signUp(email, password)
                             } else {
                                 Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
                             }
-                        }else{
+                        } else {
                             Toast.makeText(context, "Password requirements not met", Toast.LENGTH_SHORT).show()
                         }
-
                     }
                 )
 
@@ -263,7 +203,7 @@ fun SignUpScreen(
                 GoogleSignInButton(
                     text = "Sign up with Google",
                     onClick = {
-                        viewModel.signInWithGoogle(current)
+                        viewModel.signInWithGoogle(context)
                     }
                 )
             }
@@ -306,4 +246,3 @@ fun PasswordRequirementItem(text: String, isMet: Boolean) {
         )
     }
 }
-
