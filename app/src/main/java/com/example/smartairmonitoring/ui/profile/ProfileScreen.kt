@@ -1,6 +1,6 @@
 package com.example.smartairmonitoring.ui.profile
 
-import androidx.compose.foundation.background
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -63,6 +64,7 @@ fun ProfileScreen(
                 ProfileContent(
                     user = state.user,
                     modifier = Modifier.padding(padding),
+                    onUpdateField = { field, value -> viewModel.updateField(field, value) },
                     onToggleChange = { field, value -> viewModel.updateToggle(field, value) },
                     onLogout = {
                         viewModel.logout()
@@ -83,9 +85,18 @@ fun ProfileScreen(
 fun ProfileContent(
     user: User,
     modifier: Modifier = Modifier,
+    onUpdateField: (String, String) -> Unit,
     onToggleChange: (String, Boolean) -> Unit,
     onLogout: () -> Unit
 ) {
+    var showEditDialog by remember { mutableStateOf<Pair<String, String>?>(null) } // fieldName, currentVal
+    val context = LocalContext.current
+
+    val ageGroups = listOf("Under 18", "18 - 24", "25 - 34", "35 - 44", "45 - 54", "55 - 64", "65+")
+    val healthConditions = listOf("Asthma", "Allergies", "Bronchitis", "COPD", "Heart Condition", "None", "Others")
+    val activityLevels = listOf("Sedentary", "Lightly Active", "Active", "Very Active")
+    val towns = listOf("Dushanbe", "Khujand", "Bokhtar", "Kulob", "Istaravshan", "Panjakent", "Khorugh", "Tursunzoda", "Hisor")
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -122,13 +133,13 @@ fun ProfileContent(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column {
-                ProfileItem("Age Group", user.ageGroup)
+                ProfileItem("Age Group", user.ageGroup) { showEditDialog = "ageGroup" to user.ageGroup }
                 HorizontalDivider(color = BackgroundElevated, thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 16.dp))
-                ProfileItem("Health Condition", user.healthCondition)
+                ProfileItem("Health Condition", user.healthCondition) { showEditDialog = "healthCondition" to user.healthCondition }
                 HorizontalDivider(color = BackgroundElevated, thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 16.dp))
-                ProfileItem("Activity Level", user.activityLevel)
+                ProfileItem("Activity Level", user.activityLevel) { showEditDialog = "activityLevel" to user.activityLevel }
                 HorizontalDivider(color = BackgroundElevated, thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 16.dp))
-                ProfileItem("Location", user.location)
+                ProfileItem("Location", user.location) { showEditDialog = "location" to user.location }
             }
         }
 
@@ -158,11 +169,13 @@ fun ProfileContent(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column {
-                AboutItem("About Airi")
+                AboutItem("About SmartAir") {
+                    Toast.makeText(context, "SmartAir v1.0 - Your Air Quality Companion", Toast.LENGTH_SHORT).show()
+                }
                 HorizontalDivider(color = BackgroundElevated, thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 16.dp))
-                AboutItem("Privacy Policy")
+                AboutItem("Privacy Policy") { }
                 HorizontalDivider(color = BackgroundElevated, thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 16.dp))
-                AboutItem("Terms of Use")
+                AboutItem("Terms of Use") { }
             }
         }
 
@@ -177,13 +190,73 @@ fun ProfileContent(
         
         Spacer(modifier = Modifier.height(40.dp))
     }
+
+    // Generic Edit Dialog
+    showEditDialog?.let { (field, currentVal) ->
+        var newValue by remember { mutableStateOf(currentVal) }
+        AlertDialog(
+            onDismissRequest = { showEditDialog = null },
+            title = { Text("Edit ${field.replaceFirstChar { it.uppercase() }}", color = TextPrimary) },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    val options = when (field) {
+                        "ageGroup" -> ageGroups
+                        "healthCondition" -> healthConditions
+                        "activityLevel" -> activityLevels
+                        "location" -> towns
+                        else -> emptyList()
+                    }
+
+                    if (options.isNotEmpty()) {
+                        options.forEach { option ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { newValue = option }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(selected = newValue == option, onClick = { newValue = option })
+                                Text(option, color = TextPrimary)
+                            }
+                        }
+                    } else {
+                        OutlinedTextField(
+                            value = newValue,
+                            onValueChange = { newValue = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            )
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onUpdateField(field, newValue)
+                    showEditDialog = null
+                }) {
+                    Text("Save", color = AIAccent)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditDialog = null }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            },
+            containerColor = BackgroundSecondary
+        )
+    }
 }
 
 @Composable
-fun ProfileItem(label: String, value: String) {
+fun ProfileItem(label: String, value: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() }
             .padding(16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -220,11 +293,11 @@ fun ToggleItem(label: String, isChecked: Boolean, onCheckedChange: (Boolean) -> 
 }
 
 @Composable
-fun AboutItem(label: String) {
+fun AboutItem(label: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { }
+            .clickable { onClick() }
             .padding(16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically

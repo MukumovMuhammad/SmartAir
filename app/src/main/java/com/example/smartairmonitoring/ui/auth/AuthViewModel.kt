@@ -71,7 +71,7 @@ class AuthViewModel : ViewModel() {
                         .document(firebaseUser.uid)
                         .set(user)
                         .await()
-                    
+
                     _authState.value = AuthState.NeedsProfileCompletion
                 } else {
                     _authState.value = AuthState.Error("Registration failed: User is null")
@@ -100,17 +100,22 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    private suspend fun checkProfileCompletion(uid: String) {
+    suspend fun checkProfileCompletion(uid: String) {
+        Log.d(TAG, "Checking profile completion for user: $uid")
         try {
             val doc = db.collection("users").document(uid).get().await()
             if (doc.exists()) {
+                Log.d(TAG, "Document exists for user: $uid")
                 val userObj = doc.toObject(User::class.java)
                 if (userObj?.firstName.isNullOrEmpty() || userObj?.surname.isNullOrEmpty()) {
+                    Log.d(TAG, "User needs profile completion")
                     _authState.value = AuthState.NeedsProfileCompletion
                 } else {
+                    Log.d(TAG, "User profile is complete")
                     _authState.value = AuthState.Success
                 }
             } else {
+                Log.d(TAG, "Document does not exist for user: $uid")
                 // If document doesn't exist for some reason, we need to create it and complete it
                 _authState.value = AuthState.NeedsProfileCompletion
             }

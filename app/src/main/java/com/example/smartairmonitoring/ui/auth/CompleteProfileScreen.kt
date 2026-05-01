@@ -8,6 +8,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -132,48 +135,50 @@ fun CompleteProfileScreen(
 
             // Age Group Section
             SectionHeader(title = "Your Age Group")
-            FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 80.dp), // Adjust based on chip width
+                modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                ageGroups.forEach { age ->
-                    val isSelected = selectedAgeGroup == age
+                items(ageGroups) { age ->
                     SelectableChip(
                         text = age,
-                        isSelected = isSelected,
+                        isSelected = (selectedAgeGroup == age),
                         onClick = { selectedAgeGroup = age }
                     )
                 }
             }
 
+
             Spacer(modifier = Modifier.height(24.dp))
 
             // Health Conditions Section
             SectionHeader(title = "Health Conditions", subtitle = "Select all that apply")
-            FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 100.dp), // Adjust minSize to fit your chips
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 1000.dp) // Important: Give it a max height constraint
+                    .padding(vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                userScrollEnabled = false // Makes it behave like a standard FlowRow
             ) {
-                healthConditions.forEach { condition ->
+                items(healthConditions) { condition ->
                     val isSelected = selectedConditions.contains(condition)
+
                     SelectableChip(
                         text = condition,
                         isSelected = isSelected,
                         showCheckbox = true,
                         onClick = {
-                            val newSet = selectedConditions.toMutableSet()
-                            if (condition == "None") {
-                                if (isSelected) newSet.remove("None") else {
-                                    newSet.clear()
-                                    newSet.add("None")
-                                }
+                            selectedConditions = if (condition == "None") {
+                                if (isSelected) emptySet() else setOf("None")
                             } else {
-                                newSet.remove("None")
-                                if (isSelected) newSet.remove(condition) else newSet.add(condition)
+                                val current = selectedConditions - "None"
+                                if (isSelected) current - condition else current + condition
                             }
-                            selectedConditions = newSet
                         }
                     )
                 }

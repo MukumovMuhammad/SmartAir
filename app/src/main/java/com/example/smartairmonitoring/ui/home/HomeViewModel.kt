@@ -27,7 +27,7 @@ class HomeViewModel : ViewModel() {
         loadHomeData()
     }
 
-    private fun loadHomeData() {
+    fun loadHomeData() {
         val uid = auth.currentUser?.uid ?: return
         viewModelScope.launch {
             _homeState.value = HomeState.Loading
@@ -37,6 +37,18 @@ class HomeViewModel : ViewModel() {
                 _homeState.value = HomeState.Success(user?.location ?: "Dushanbe")
             } catch (e: Exception) {
                 _homeState.value = HomeState.Error(e.localizedMessage ?: "Failed to load home data")
+            }
+        }
+    }
+
+    fun updateLocation(newLocation: String) {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(uid).update("location", newLocation).await()
+                _homeState.value = HomeState.Success(newLocation)
+            } catch (e: Exception) {
+                // Handle error
             }
         }
     }

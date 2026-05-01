@@ -50,19 +50,39 @@ class ProfileViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 db.collection("users").document(uid).update(field, value).await()
-                val currentState = _profileState.value
-                if (currentState is ProfileState.Success) {
-                    val updatedUser = when (field) {
-                        "notificationsEnabled" -> currentState.user.copy(notificationsEnabled = value)
-                        "dailyForecastEnabled" -> currentState.user.copy(dailyForecastEnabled = value)
-                        "healthTipsEnabled" -> currentState.user.copy(healthTipsEnabled = value)
-                        else -> currentState.user
-                    }
-                    _profileState.value = ProfileState.Success(updatedUser)
-                }
+                refreshLocalUser(field, value)
             } catch (e: Exception) {
                 // Handle error
             }
+        }
+    }
+
+    fun updateField(field: String, value: String) {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(uid).update(field, value).await()
+                refreshLocalUser(field, value)
+            } catch (e: Exception) {
+                // Handle error
+            }
+        }
+    }
+
+    private fun refreshLocalUser(field: String, value: Any) {
+        val currentState = _profileState.value
+        if (currentState is ProfileState.Success) {
+            val updatedUser = when (field) {
+                "notificationsEnabled" -> currentState.user.copy(notificationsEnabled = value as Boolean)
+                "dailyForecastEnabled" -> currentState.user.copy(dailyForecastEnabled = value as Boolean)
+                "healthTipsEnabled" -> currentState.user.copy(healthTipsEnabled = value as Boolean)
+                "ageGroup" -> currentState.user.copy(ageGroup = value as String)
+                "healthCondition" -> currentState.user.copy(healthCondition = value as String)
+                "activityLevel" -> currentState.user.copy(activityLevel = value as String)
+                "location" -> currentState.user.copy(location = value as String)
+                else -> currentState.user
+            }
+            _profileState.value = ProfileState.Success(updatedUser)
         }
     }
     

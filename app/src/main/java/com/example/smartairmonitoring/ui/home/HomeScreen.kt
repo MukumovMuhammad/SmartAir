@@ -1,8 +1,10 @@
 package com.example.smartairmonitoring.ui.home
 
+import android.app.Activity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -11,9 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,23 +21,46 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import com.example.smartairmonitoring.R
-import com.example.smartairmonitoring.ui.components.PrimaryGradientButton
 import com.example.smartairmonitoring.ui.theme.*
 
 @Composable
 fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
     val homeState by viewModel.homeState.collectAsState()
+    var showLocationDialog by remember { mutableStateOf(false) }
+    
+    // Determine background image and system bar color based on AQI
+    val aqiValue = 50 // This should ideally come from homeState
+    
+    val (backgroundImage, systemBarColor) = when {
+        aqiValue <= 50 -> R.drawable.img_good_air to Color(0xFF2E7D32) // Deep Green
+        aqiValue <= 100 -> R.drawable.img_mid_air to Color(0xFFF57F17) // Deep Orange/Yellow
+        else -> R.drawable.img_air_pulluted to Color(0xFF37474F) // Dark Blue Grey/Polluted
+    }
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            window.statusBarColor = systemBarColor.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+        }
+    }
+
+    val towns = listOf("Dushanbe", "Khujand", "Bokhtar", "Kulob", "Istaravshan", "Panjakent", "Khorugh", "Tursunzoda", "Hisor")
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Background Image
+        // Dynamic Background Image
         Image(
-            painter = painterResource(id = R.drawable.bg_img),
+            painter = painterResource(id = backgroundImage),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
@@ -47,15 +70,18 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(BackgroundDeepNavy.copy(alpha = 0.85f))
+                .background(BackgroundDeepNavy.copy(alpha = 0.7f))
         )
 
         Scaffold(
             topBar = { 
                 val location = (homeState as? HomeState.Success)?.userLocation ?: "Dushanbe"
-                HomeTopBar(location) 
+                HomeTopBar(
+                    location = location,
+                    onLocationClick = { showLocationDialog = true }
+                ) 
             },
-            containerColor = Color.Transparent // Make scaffold transparent to show background
+            containerColor = Color.Transparent
         ) { padding ->
             Column(
                 modifier = Modifier
@@ -69,7 +95,7 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 
-                AQIGauge(aqi = 165, status = "Unhealthy", subStatus = "for Sensitive Groups")
+                AQIGauge(aqi = aqiValue, status = "Unhealthy", subStatus = "for Sensitive Groups")
                 
                 Spacer(modifier = Modifier.height(32.dp))
                 Row(
@@ -93,10 +119,43 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
             }
         }
     }
+
+    if (showLocationDialog) {
+        AlertDialog(
+            onDismissRequest = { showLocationDialog = false },
+            title = { Text("Select Town", color = TextPrimary) },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    towns.forEach { town ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.updateLocation(town)
+                                    showLocationDialog = false
+                                }
+                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(town, color = TextPrimary, fontSize = 16.sp)
+                        }
+                        HorizontalDivider(color = BackgroundElevated, thickness = 0.5.dp)
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showLocationDialog = false }) {
+                    Text("Cancel", color = AIAccent)
+                }
+            },
+            containerColor = BackgroundSecondary
+        )
+    }
 }
 
 @Composable
-fun HomeTopBar(location: String) {
+fun HomeTopBar(location: String, onLocationClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -104,11 +163,15 @@ fun HomeTopBar(location: String) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = { }) {
-            Icon(imageVector = Icons.Default.Menu, contentDescription = "Menu", tint = TextPrimary)
-        }
+        Box(modifier = Modifier.size(48.dp)) 
         
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { onLocationClick() }
+                .padding(8.dp)
+        ) {
             Text(
                 text = location,
                 color = TextPrimary,
@@ -135,8 +198,8 @@ fun LocationHeader() {
 
 @Composable
 fun AQIGauge(aqi: Int, status: String, subStatus: String) {
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(220.dp)) {
-        Canvas(modifier = Modifier.size(200.dp)) {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(230.dp)) {
+        Canvas(modifier = Modifier.size(220.dp)) {
             drawArc(
                 brush = Brush.sweepGradient(AQICircleGradient),
                 startAngle = 135f,
@@ -149,8 +212,12 @@ fun AQIGauge(aqi: Int, status: String, subStatus: String) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = status,
-                color = Color(0xFFEF4444),
-                fontSize = 24.sp,
+                color = when {
+                    aqi <= 50 -> Color(0xFF22C55E)
+                    aqi <= 100 -> Color(0xFFEAB308)
+                    else -> Color(0xFFEF4444)
+                },
+                fontSize = 22.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
@@ -179,7 +246,7 @@ fun InfoCard(label: String, value: String, unit: String, icon: androidx.compose.
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
-            .background(BackgroundSecondary.copy(alpha = 0.7f)) // Slightly transparent
+            .background(BackgroundSecondary.copy(alpha = 0.7f))
             .padding(12.dp)
     ) {
         Text(text = label, color = TextSecondary, fontSize = 12.sp)
