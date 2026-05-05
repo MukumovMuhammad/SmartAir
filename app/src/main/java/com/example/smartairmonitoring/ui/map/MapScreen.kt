@@ -1,5 +1,6 @@
 package com.example.smartairmonitoring.ui.map
 
+import android.graphics.Color.rgb
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -12,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,21 +21,38 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartairmonitoring.ui.theme.*
 import com.mapbox.geojson.Point
+import com.mapbox.maps.CameraOptions
+import com.mapbox.maps.extension.compose.MapEffect
 import com.mapbox.maps.extension.compose.MapboxMap
 import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
+import com.mapbox.maps.extension.compose.annotation.IconImage
+import com.mapbox.maps.extension.compose.annotation.generated.PointAnnotation
+import com.mapbox.maps.extension.compose.annotation.generated.PointAnnotationGroup
+import com.mapbox.maps.extension.compose.annotation.rememberIconImage
 import com.mapbox.maps.extension.compose.style.MapStyle
 import com.mapbox.maps.extension.style.expressions.dsl.generated.*
 import com.mapbox.maps.extension.style.expressions.generated.Expression.Companion.interpolate
 import com.mapbox.maps.extension.style.expressions.generated.Expression.Companion.linear
+import com.mapbox.maps.extension.style.layers.addLayer
 import com.mapbox.maps.extension.style.layers.generated.heatmapLayer
 import com.mapbox.maps.extension.style.layers.properties.generated.*
+import com.mapbox.maps.extension.style.sources.addSource
+import com.mapbox.maps.extension.style.sources.generated.GeoJsonSource
 import com.mapbox.maps.extension.style.sources.generated.geoJsonSource
 import com.mapbox.maps.extension.style.types.StyleTransition
+import com.mapbox.maps.plugin.annotation.AnnotationManager
+import com.mapbox.maps.plugin.annotation.generated.CircleAnnotation
+import com.mapbox.maps.plugin.annotation.generated.PointAnnotationManager
+import com.mapbox.maps.plugin.annotation.generated.PointAnnotationOptions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,6 +60,14 @@ fun MapScreen(onBackClick: () -> Unit) {
 
     var selectedFilter by remember { mutableStateOf("AQI") }
     val filters = listOf("AQI", "PM2.5", "PM10", "O3", "NO2")
+
+    var selectedMapStyle by remember { mutableStateOf("mapbox://styles/mapbox/standard") }
+    val FilterMaps = listOf(
+        "mapbox://styles/mapbox/standard",
+        "mapbox://styles/mapbox/dark-v11",
+        "mapbox://styles/mapbox/streets-v12",
+        "mapbox://styles/mapbox/standard-satellite"
+    )
 
     val mapViewportState = rememberMapViewportState {
         setCameraOptions {
@@ -61,8 +88,33 @@ fun MapScreen(onBackClick: () -> Unit) {
                     )
                 },
                 actions = {
-                    IconButton(onClick = {}) {
-                        Icon(Icons.Default.Layers, contentDescription = null, tint = TextPrimary)
+                    var showStyleMenu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { showStyleMenu = true }) {
+                            Icon(Icons.Default.Layers, contentDescription = null, tint = TextPrimary)
+                        }
+                        DropdownMenu(
+                            expanded = showStyleMenu,
+                            onDismissRequest = { showStyleMenu = false },
+                            modifier = Modifier.background(BackgroundSecondary)
+                        ) {
+                            FilterMaps.forEach { style ->
+                                val label = when {
+                                    style.contains("satellite") -> "Satellite"
+                                    style.contains("standard") -> "Standard"
+                                    style.contains("dark") -> "Dark"
+                                    style.contains("streets") -> "Streets"
+                                    else -> style.substringAfterLast("/")
+                                }
+                                DropdownMenuItem(
+                                    text = { Text(label, color = TextPrimary) },
+                                    onClick = {
+                                        selectedMapStyle = style
+                                        showStyleMenu = false
+                                    }
+                                )
+                            }
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -73,14 +125,14 @@ fun MapScreen(onBackClick: () -> Unit) {
         containerColor = BackgroundDeepNavy
     ) { padding ->
 
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
         ) {
 
-            // FILTERS
+            // FILTERS (fixed)
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -96,20 +148,79 @@ fun MapScreen(onBackClick: () -> Unit) {
                 }
             }
 
-            // 🔥 FIXED HEIGHT MAP (IMPORTANT)
+            // 🗺️ MAP (FULLY INTERACTIVE)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-            )
-            {
+                    .fillMaxHeight(0.5f)
+            ) {
+                val points = listOf(
+                    Point.fromLngLat(68.8, 38.5),
+                    Point.fromLngLat(69.0, 38.6),
+                    Point.fromLngLat(68.6, 38.4)
+                )
                 MapboxMap(
                     modifier = Modifier.fillMaxSize(),
                     mapViewportState = mapViewportState,
-                    style = { airMapStyle() }
-                )
+                    style = { MapStyle(selectedMapStyle) } // Base style (Satellite/Dark/etc)
+                ) {
+                    // 1. Prepare your data
+                    val geoJsonData = """
+    {
+      "type": "FeatureCollection",
+      "features": [
+        { "type": "Feature", "properties": { "aqi": 50 }, "geometry": { "type": "Point", "coordinates": [68.8, 38.5] } },
+        { "type": "Feature", "properties": { "aqi": 180 }, "geometry": { "type": "Point", "coordinates": [69.0, 38.6] } },
+        { "type": "Feature", "properties": { "aqi": 300 }, "geometry": { "type": "Point", "coordinates": [68.6, 38.4] } }
+      ]
+    }
+    """.trimIndent()
+
+                    // 2. Use MapEffect to add the source and layer manually
+                    MapEffect(Unit) { mapView ->
+                        mapView.mapboxMap.getStyle { style ->
+                            // Add the data source
+                            style.addSource(
+                                geoJsonSource("aqi-source") {
+                                    data(geoJsonData)
+                                }
+                            )
+
+                            // Add the heatmap layer
+                            style.addLayer(
+                                heatmapLayer("aqi-heat", "aqi-source") {
+                                    heatmapWeight(get("aqi"))
+                                    heatmapRadius(40.0)
+                                    heatmapOpacity(0.8)
+                                    // Color ramp: Green (Good) -> Yellow (Moderate) -> Red (Hazardous)
+                                    heatmapColor(
+                                        interpolate {
+                                            linear()
+                                            heatmapDensity()
+                                            stop { literal(0.0); rgba(0.0, 0.0, 0.0, 0.0) }
+                                            stop { literal(0.2); rgb(0.0, 255.0, 0.0) }    // Green
+                                            stop { literal(0.4); rgb(255.0, 255.0, 0.0) }  // Yellow
+                                            stop { literal(0.6); rgb(255.0, 126.0, 0.0) }  // Orange
+                                            stop { literal(0.8); rgb(255.0, 0.0, 0.0) }    // Red
+                                            stop { literal(1.0); rgb(143.0, 63.0, 151.0) } // Purple
+                                     }
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+
 
                 FloatingActionButton(
-                    onClick = {},
+                    onClick = {
+                        mapViewportState.flyTo(
+                            CameraOptions.Builder()
+                                .center(Point.fromLngLat(68.7791, 38.5358)) // new location
+                                .zoom(8.0)
+                                .build()
+                        )
+                    },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(16.dp)
@@ -118,19 +229,26 @@ fun MapScreen(onBackClick: () -> Unit) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
+            // 🔻 SCROLLABLE PART ONLY HERE
             Column(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp) // 👈 fixed height
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 LegendCard()
-                Spacer(modifier = Modifier.height(6.dp))
                 LocationDetailCard()
+
             }
         }
     }
+
+
 }
+
+
 
 @Composable
 fun LocationDetailCard() {
@@ -266,56 +384,3 @@ fun LegendCard() {
     }
 }
 
-
-@Composable
-fun airMapStyle() {
-    MapStyle(
-        style = "mapbox://styles/mapbox/dark-v11",
-        styleImportsContent = {
-
-            geoJsonSource("air-source") {
-                data(
-                    """
-        {
-          "type": "FeatureCollection",
-          "features": [
-            {"type":"Feature","geometry":{"type":"Point","coordinates":[68.8,38.5]}},
-            {"type":"Feature","geometry":{"type":"Point","coordinates":[69.0,38.6]}},
-            {"type":"Feature","geometry":{"type":"Point","coordinates":[68.6,38.4]}},
-            {"type":"Feature","geometry":{"type":"Point","coordinates":[68.7,38.55]}},
-            {"type":"Feature","geometry":{"type":"Point","coordinates":[68.9,38.45]}},
-            {"type":"Feature","geometry":{"type":"Point","coordinates":[68.75,38.52]}}
-          ]
-        }
-        """.trimIndent()
-                )
-            }
-
-            heatmapLayer("heatmap-layer", "air-source") {
-
-                heatmapWeight(literal(5.0)) // 👈 VERY IMPORTANT
-
-                heatmapIntensity(3.0) // 👈 stronger
-
-                heatmapRadius(80.0) // 👈 bigger area
-
-                heatmapOpacity(1.0)
-
-                heatmapColor(
-                    interpolate(
-                        linear(),
-                        heatmapDensity(),
-
-                        literal(0.0), rgba(0.0,0.0,255.0,0.0),
-
-                        literal(0.2), rgb(0.0,255.0,0.0),
-                        literal(0.4), rgb(255.0,255.0,0.0),
-                        literal(0.6), rgb(255.0,165.0,0.0),
-                        literal(0.8), rgb(255.0,0.0,0.0),
-                        literal(1.0), rgb(128.0,0.0,128.0)
-                    )
-                )
-            }
-        }
-    )
-}
