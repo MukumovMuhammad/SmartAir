@@ -166,18 +166,38 @@ fun MapScreen(onBackClick: () -> Unit) {
                 ) {
                     // 1. Prepare your data
                     val geoJsonData = """
-    {
-      "type": "FeatureCollection",
-      "features": [
-        { "type": "Feature", "properties": { "aqi": 50 }, "geometry": { "type": "Point", "coordinates": [68.8, 38.5] } },
-        { "type": "Feature", "properties": { "aqi": 180 }, "geometry": { "type": "Point", "coordinates": [69.0, 38.6] } },
-        { "type": "Feature", "properties": { "aqi": 300 }, "geometry": { "type": "Point", "coordinates": [68.6, 38.4] } }
-      ]
-    }
-    """.trimIndent()
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "properties": { "aqi": 210 }, "geometry": { "type": "Point", "coordinates": [68.78, 38.53] } },
+    { "type": "Feature", "properties": { "aqi": 180 }, "geometry": { "type": "Point", "coordinates": [68.85, 38.50] } },
+    { "type": "Feature", "properties": { "aqi": 150 }, "geometry": { "type": "Point", "coordinates": [68.70, 38.60] } },
+    { "type": "Feature", "properties": { "aqi": 90 }, "geometry": { "type": "Point", "coordinates": [68.40, 38.50] } },
+    { "type": "Feature", "properties": { "aqi": 120 }, "geometry": { "type": "Point", "coordinates": [69.20, 38.55] } },
+    
+    { "type": "Feature", "properties": { "aqi": 75 }, "geometry": { "type": "Point", "coordinates": [69.62, 40.28] } },
+    { "type": "Feature", "properties": { "aqi": 60 }, "geometry": { "type": "Point", "coordinates": [69.50, 40.10] } },
+    { "type": "Feature", "properties": { "aqi": 110 }, "geometry": { "type": "Point", "coordinates": [70.10, 40.00] } },
+    { "type": "Feature", "properties": { "aqi": 45 }, "geometry": { "type": "Point", "coordinates": [68.80, 39.50] } },
+
+    
+    { "type": "Feature", "properties": { "aqi": 140 }, "geometry": { "type": "Point", "coordinates": [67.84, 37.83] } },
+    { "type": "Feature", "properties": { "aqi": 165 }, "geometry": { "type": "Point", "coordinates": [68.00, 37.50] } },
+    { "type": "Feature", "properties": { "aqi": 80 }, "geometry": { "type": "Point", "coordinates": [69.10, 37.90] } },
+    { "type": "Feature", "properties": { "aqi": 55 }, "geometry": { "type": "Point", "coordinates": [69.50, 37.30] } },
+
+  
+    { "type": "Feature", "properties": { "aqi": 30 }, "geometry": { "type": "Point", "coordinates": [71.55, 37.49] } },
+    { "type": "Feature", "properties": { "aqi": 25 }, "geometry": { "type": "Point", "coordinates": [72.50, 38.20] } },
+    { "type": "Feature", "properties": { "aqi": 20 }, "geometry": { "type": "Point", "coordinates": [73.50, 38.80] } },
+    { "type": "Feature", "properties": { "aqi": 40 }, "geometry": { "type": "Point", "coordinates": [74.50, 38.00] } }
+  ]
+}
+""".trimIndent()
+
 
                     // 2. Use MapEffect to add the source and layer manually
-                    MapEffect(Unit) { mapView ->
+                    MapEffect(selectedMapStyle) { mapView ->
                         mapView.mapboxMap.getStyle { style ->
                             // Add the data source
                             style.addSource(
@@ -189,21 +209,42 @@ fun MapScreen(onBackClick: () -> Unit) {
                             // Add the heatmap layer
                             style.addLayer(
                                 heatmapLayer("aqi-heat", "aqi-source") {
-                                    heatmapWeight(get("aqi"))
-                                    heatmapRadius(40.0)
+                                    // Normalize weight: AQI 300 = weight 1.0
+                                    heatmapWeight(
+                                        interpolate {
+                                            linear()
+                                            get("aqi")
+                                            stop { literal(0.0); literal(0.0) }
+                                            stop { literal(300.0); literal(1.0) }
+                                        }
+                                    )
+                                    
+                                    heatmapRadius(
+                                        interpolate {
+                                            linear()
+                                            zoom()
+                                            stop { literal(5.0); literal(20.0) }
+                                            stop { literal(12.0); literal(80.0) }
+                                        }
+                                    )
+
+                                    // Intensity 1.0 ensures a single max-weight point reaches max density
+                                    heatmapIntensity(1.0)
+
                                     heatmapOpacity(0.8)
-                                    // Color ramp: Green (Good) -> Yellow (Moderate) -> Red (Hazardous)
+                                    // Color ramp mapped to the normalized AQI scale (0-300)
+                                    // 50/300 ≈ 0.16, 100/300 ≈ 0.33, 150/300 ≈ 0.5, 200/300 ≈ 0.66
                                     heatmapColor(
                                         interpolate {
                                             linear()
                                             heatmapDensity()
                                             stop { literal(0.0); rgba(0.0, 0.0, 0.0, 0.0) }
-                                            stop { literal(0.2); rgb(0.0, 255.0, 0.0) }    // Green
-                                            stop { literal(0.4); rgb(255.0, 255.0, 0.0) }  // Yellow
-                                            stop { literal(0.6); rgb(255.0, 126.0, 0.0) }  // Orange
-                                            stop { literal(0.8); rgb(255.0, 0.0, 0.0) }    // Red
-                                            stop { literal(1.0); rgb(143.0, 63.0, 151.0) } // Purple
-                                     }
+                                            stop { literal(0.16); rgb(34.0, 197.0, 94.0) }   // Good (50)
+                                            stop { literal(0.33); rgb(234.0, 179.0, 8.0) }   // Moderate (100)
+                                            stop { literal(0.5); rgb(249.0, 115.0, 22.0) }   // Sensitive (150)
+                                            stop { literal(0.66); rgb(239.0, 68.0, 68.0) }   // Unhealthy (200)
+                                            stop { literal(1.0); rgb(168.0, 85.0, 247.0) }   // Hazardous (300+)
+                                        }
                                     )
                                 }
                             )
