@@ -41,11 +41,6 @@ fun ForecastScreen(onBackClick: () -> Unit) {
                         fontWeight = FontWeight.SemiBold
                     )
                 },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = null, tint = TextPrimary)
-                    }
-                },
                 actions = {
                     IconButton(onClick = { }) {
                         Icon(Icons.Default.Info, contentDescription = null, tint = TextPrimary)
