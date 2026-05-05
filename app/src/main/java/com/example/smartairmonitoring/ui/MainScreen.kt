@@ -23,6 +23,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.smartairmonitoring.modul.core.navigation.Screen
+import com.example.smartairmonitoring.ui.forecast.ForecastScreen
 import com.example.smartairmonitoring.ui.home.HomeScreen
 import com.example.smartairmonitoring.ui.home.HomeViewModel
 import com.example.smartairmonitoring.ui.map.MapScreen
@@ -100,7 +101,9 @@ fun MainScreen(
             composable(Screen.Map.route) { 
                 MapScreen(onBackClick = { navController.popBackStack() }) 
             }
-            composable(Screen.Forecast.route) { PlaceholderScreen("Forecast Screen") }
+            composable(Screen.Forecast.route) { 
+                ForecastScreen(onBackClick = { navController.popBackStack() }) 
+            }
             composable(Screen.AIAssistant.route) { PlaceholderScreen("AI Assistant Screen") }
             composable(Screen.Profile.route) { 
                 val profileViewModel: ProfileViewModel = viewModel()
