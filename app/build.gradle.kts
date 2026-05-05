@@ -75,6 +75,10 @@ dependencies {
     val nav_version = "2.8.4"
     implementation("androidx.navigation:navigation-compose:$nav_version")
 
+//    MAP
+    implementation("com.mapbox.maps:android-ndk27:11.23.0")
+    implementation("com.mapbox.extension:maps-compose-ndk27:11.23.0")
+
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("com.airbnb.android:lottie-compose:6.1.0")
 

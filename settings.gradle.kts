@@ -19,7 +19,12 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven {
+            url = uri("https://api.mapbox.com/downloads/v2/releases/maven")
+        }
     }
+
+
 }
 
 rootProject.name = "Smart Air Monitoring"

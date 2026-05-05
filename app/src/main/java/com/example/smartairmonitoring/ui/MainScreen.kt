@@ -25,6 +25,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.smartairmonitoring.modul.core.navigation.Screen
 import com.example.smartairmonitoring.ui.home.HomeScreen
 import com.example.smartairmonitoring.ui.home.HomeViewModel
+import com.example.smartairmonitoring.ui.map.MapScreen
 import com.example.smartairmonitoring.ui.profile.ProfileScreen
 import com.example.smartairmonitoring.ui.profile.ProfileViewModel
 import com.example.smartairmonitoring.ui.theme.*
@@ -39,7 +40,7 @@ fun MainScreen(
         BottomNavItem("Home", Screen.Home.route, Icons.Filled.Home, Icons.Outlined.Home),
         BottomNavItem("Map", Screen.Map.route, Icons.Filled.LocationOn, Icons.Outlined.LocationOn),
         BottomNavItem("Forecast", Screen.Forecast.route, Icons.Filled.DateRange, Icons.Outlined.DateRange),
-        BottomNavItem("AI Assistant", Screen.AIAssistant.route, Icons.Filled.Face, Icons.Outlined.Face),
+        BottomNavItem("AI", Screen.AIAssistant.route, Icons.Filled.Face, Icons.Outlined.Face),
         BottomNavItem("Profile", Screen.Profile.route, Icons.Filled.Person, Icons.Outlined.Person)
     )
 
@@ -84,10 +85,11 @@ fun MainScreen(
             }
         }
     ) { innerPadding ->
+        val pad = innerPadding
         NavHost(
             navController = navController,
             startDestination = Screen.Home.route,
-            modifier = Modifier.padding(innerPadding)
+
         ) {
             composable(Screen.Home.route) { 
                 val homeViewModel: HomeViewModel = viewModel()
@@ -95,7 +97,9 @@ fun MainScreen(
                     onLogout()
                 }
             }
-            composable(Screen.Map.route) { PlaceholderScreen("Map Screen") }
+            composable(Screen.Map.route) { 
+                MapScreen(onBackClick = { navController.popBackStack() }) 
+            }
             composable(Screen.Forecast.route) { PlaceholderScreen("Forecast Screen") }
             composable(Screen.AIAssistant.route) { PlaceholderScreen("AI Assistant Screen") }
             composable(Screen.Profile.route) { 
