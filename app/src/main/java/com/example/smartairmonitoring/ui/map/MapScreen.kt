@@ -165,7 +165,7 @@ fun MapScreen(onBackClick: () -> Unit) {
                     style = { MapStyle(selectedMapStyle) } // Base style (Satellite/Dark/etc)
                 ) {
                     // 1. Prepare your data
-                    val geoJsonData = """
+                    val geoJsonData = """3
 {
   "type": "FeatureCollection",
   "features": [

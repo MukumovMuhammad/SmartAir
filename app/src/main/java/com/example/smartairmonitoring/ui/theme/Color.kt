@@ -35,6 +35,10 @@ val ChatBackground = Color(0xFF1E293B)
 val ChatUserBubble = Color(0xFF334155)
 val ChatAIHighlight = Color(0xFF2563EB)
 
+// Shimmer Colors
+val ShimmerBase = Color(0xFF1F2937)
+val ShimmerHighlight = Color(0xFF374151)
+
 // Gradient definitions (useful for UI components)
 val MapHeatmapGradient = listOf(AQIGood, AQIModerate, AQIUnhealthySensitive, AQIUnhealthy)
 val AQICircleGradient = listOf(AQIGood, AQIModerate, AQIUnhealthySensitive, AQIUnhealthy)
