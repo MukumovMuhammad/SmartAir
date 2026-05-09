@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.smartairmonitoring.ui.components.shimmerEffect
 import com.example.smartairmonitoring.modul.auth.User
 import com.example.smartairmonitoring.ui.theme.*
 
@@ -56,9 +57,7 @@ fun ProfileScreen(
     ) { padding ->
         when (val state = profileState) {
             is ProfileState.Loading -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = AIAccent)
-                }
+                ShimmerLoadingProfileContent(modifier = Modifier.padding(padding))
             }
             is ProfileState.Success -> {
                 ProfileContent(
@@ -78,6 +77,193 @@ fun ProfileScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun ShimmerLoadingProfileContent(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        // User Header Shimmer
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 24.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .shimmerEffect()
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Box(
+                    modifier = Modifier
+                        .width(150.dp)
+                        .height(24.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .shimmerEffect()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .width(100.dp)
+                        .height(16.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .shimmerEffect()
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .width(80.dp)
+                .height(14.dp)
+                .padding(vertical = 8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .shimmerEffect()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Profile Items Shimmer
+        Surface(
+            color = BackgroundSecondary,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                repeat(4) { index ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(100.dp)
+                                .height(20.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .shimmerEffect()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .width(60.dp)
+                                .height(20.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .shimmerEffect()
+                        )
+                    }
+                    if (index < 3) {
+                        Spacer(modifier = Modifier.height(32.dp))
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        Box(
+            modifier = Modifier
+                .width(100.dp)
+                .height(14.dp)
+                .padding(vertical = 8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .shimmerEffect()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Notification Items Shimmer
+        Surface(
+            color = BackgroundSecondary,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                repeat(3) { index ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(120.dp)
+                                .height(20.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .shimmerEffect()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(width = 40.dp, height = 24.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .shimmerEffect()
+                        )
+                    }
+                    if (index < 2) {
+                        Spacer(modifier = Modifier.height(32.dp))
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        Box(
+            modifier = Modifier
+                .width(60.dp)
+                .height(14.dp)
+                .padding(vertical = 8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .shimmerEffect()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // About Items Shimmer
+        Surface(
+            color = BackgroundSecondary,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                repeat(3) { index ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(130.dp)
+                                .height(20.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .shimmerEffect()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(CircleShape)
+                                .shimmerEffect()
+                        )
+                    }
+                    if (index < 2) {
+                        Spacer(modifier = Modifier.height(32.dp))
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .width(80.dp)
+                .height(24.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .shimmerEffect()
+        )
+        Spacer(modifier = Modifier.height(40.dp))
     }
 }
 

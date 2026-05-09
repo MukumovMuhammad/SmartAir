@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.example.smartairmonitoring.R
+import com.example.smartairmonitoring.ui.components.shimmerEffect
 import com.example.smartairmonitoring.ui.theme.*
 
 @Composable
@@ -83,39 +84,53 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
             },
             containerColor = Color.Transparent
         ) { padding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                LocationHeader()
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                AQIGauge(aqi = aqiValue, status = "Unhealthy", subStatus = "for Sensitive Groups")
-                
-                Spacer(modifier = Modifier.height(32.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    InfoCard(label = "PM2.5", value = "85", unit = "µg/m³", modifier = Modifier.weight(1f), icon = Icons.Default.Air)
-                    InfoCard(label = "PM10", value = "120", unit = "µg/m³", modifier = Modifier.weight(1f), icon = Icons.Default.Cloud)
-                    InfoCard(label = "Temperature", value = "28°C", unit = "", modifier = Modifier.weight(1f), icon = Icons.Default.WbSunny)
+            when (val state = homeState) {
+                is HomeState.Loading -> {
+                    Box(modifier = Modifier.padding(padding)) {
+                        HomeLoadingShimmer()
+                    }
                 }
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                AIAdviceCard()
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                MainPollutantCard(name = "PM2.5", value = 85, maxValue = 100)
-                
-                Spacer(modifier = Modifier.height(80.dp))
+                is HomeState.Success -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding)
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        LocationHeader()
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        AQIGauge(aqi = aqiValue, status = "Unhealthy", subStatus = "for Sensitive Groups")
+                        
+                        Spacer(modifier = Modifier.height(32.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            InfoCard(label = "PM2.5", value = "85", unit = "µg/m³", modifier = Modifier.weight(1f), icon = Icons.Default.Air)
+                            InfoCard(label = "PM10", value = "120", unit = "µg/m³", modifier = Modifier.weight(1f), icon = Icons.Default.Cloud)
+                            InfoCard(label = "Temperature", value = "28°C", unit = "", modifier = Modifier.weight(1f), icon = Icons.Default.WbSunny)
+                        }
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        AIAdviceCard()
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        MainPollutantCard(name = "PM2.5", value = 85, maxValue = 100)
+                        
+                        Spacer(modifier = Modifier.height(80.dp))
+                    }
+                }
+                is HomeState.Error -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(text = state.message, color = Color.White)
+                    }
+                }
             }
         }
     }
@@ -152,7 +167,83 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
             containerColor = BackgroundSecondary
         )
     }
+    when (val state = homeState) {
+        is HomeState.Loading -> {
+            HomeLoadingShimmer()
+        }
+        is HomeState.Success -> {
+            // ... rest of the content ...
+        }
+        is HomeState.Error -> {
+            // Show error message
+        }
+    }
 }
+
+@Composable
+fun HomeLoadingShimmer() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // City Title Shimmer
+        Box(
+            modifier = Modifier
+                .width(150.dp)
+                .height(28.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .shimmerEffect()
+        )
+        
+        // Large AQI Card Shimmer
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .shimmerEffect()
+        )
+        
+        // Grid items Shimmer
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(100.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .shimmerEffect()
+            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(100.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .shimmerEffect()
+            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(100.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .shimmerEffect()
+            )
+        }
+        
+        // Detail cards Shimmer
+        repeat(3) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .shimmerEffect()
+            )
+        }
+    }
+}
+
 
 @Composable
 fun HomeTopBar(location: String, onLocationClick: () -> Unit) {
