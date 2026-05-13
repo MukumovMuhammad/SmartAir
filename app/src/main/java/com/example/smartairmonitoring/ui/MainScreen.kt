@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -31,6 +32,9 @@ import com.example.smartairmonitoring.ui.map.MapScreen
 import com.example.smartairmonitoring.ui.profile.ProfileScreen
 import com.example.smartairmonitoring.ui.profile.ProfileViewModel
 import com.example.smartairmonitoring.ui.theme.*
+import com.example.smartairmonitoring.Data.local.SmartAirDatabase
+import com.example.smartairmonitoring.Data.repository.AirPollRepository
+import com.example.smartairmonitoring.modul.core.network.RetrofitInstance
 
 @Composable
 fun MainScreen(
@@ -93,7 +97,12 @@ fun MainScreen(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Home.route) { 
-                val homeViewModel: HomeViewModel = viewModel()
+                val context = LocalContext.current
+                val database = SmartAirDatabase.getDatabase(context)
+                val repository = AirPollRepository(RetrofitInstance.airPollApi, database.airPollDao())
+                val homeViewModel: HomeViewModel = viewModel(
+                    factory = HomeViewModel.Factory(repository)
+                )
                 HomeScreen(homeViewModel){
                     onLogout()
                 }

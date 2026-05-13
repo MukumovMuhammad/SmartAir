@@ -2,7 +2,9 @@ package com.example.smartairmonitoring.ui.home
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.smartairmonitoring.Data.local.entities.AirPollEntity
 import com.example.smartairmonitoring.Data.repository.AirPollRepository
 import com.example.smartairmonitoring.modul.auth.User
 import com.example.smartairmonitoring.modul.core.network.NetworkResponse
@@ -28,8 +30,9 @@ class HomeViewModel(
     val TAG = "HomeViewModel_TAG"
 
 
-    private val _homeState = MutableStateFlow<NetworkResponse<Unit>>(NetworkResponse.Idle)
+    private val _homeState = MutableStateFlow<NetworkResponse<AirPollEntity>>(NetworkResponse.Idle)
     val homeState = _homeState.asStateFlow()
+
 
 
     fun getCityAirData(city: String){
@@ -41,6 +44,16 @@ class HomeViewModel(
             val result = repo.fetchAndSaveCurrentAirPoll(city)
             Log.d(TAG, "the result of data is ${result}")
             _homeState.value = result
+        }
+    }
+
+    class Factory(private val repo: AirPollRepository) : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
+                @Suppress("UNCHECKED_CAST")
+                return HomeViewModel(repo) as T
+            }
+            throw IllegalArgumentException("Unknown ViewModel class")
         }
     }
 }

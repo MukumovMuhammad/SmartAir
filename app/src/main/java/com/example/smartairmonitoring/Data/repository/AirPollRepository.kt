@@ -20,11 +20,11 @@ class AirPollRepository @Inject constructor(
 ) {
     fun getLocalHistory(): Flow<List<AirPollEntity>> = dao.getAllHistory()
 
-    suspend fun fetchAndSaveCurrentAirPoll(city: String = "Dushanbe"): NetworkResponse<Unit> = withContext(Dispatchers.IO) {
+    suspend fun fetchAndSaveCurrentAirPoll(city: String = "Dushanbe"): NetworkResponse<AirPollEntity> = withContext(Dispatchers.IO) {
         try {
             val response = api.getAirPollData(city)
             dao.insertAirPollution(response.toEntity())
-            NetworkResponse.Success(Unit)
+            NetworkResponse.Success(response.toEntity())
         } catch (e: Exception) {
             NetworkResponse.Error(e.message ?: "Failed to fetch air pollution data")
         }

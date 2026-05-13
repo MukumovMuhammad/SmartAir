@@ -1,6 +1,9 @@
 package com.example.smartairmonitoring.ui.home
 
 import android.app.Activity
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -38,14 +41,15 @@ import com.example.smartairmonitoring.ui.theme.*
 fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
     val homeState by viewModel.homeState.collectAsState()
     var showLocationDialog by remember { mutableStateOf(false) }
-    
-    // Determine background image and system bar color based on AQI
-    val aqiValue = 50 // This should ideally come from homeState
-    
-    val (backgroundImage, systemBarColor) = when {
-        aqiValue <= 50 -> R.drawable.img_good_air to Color(0xFF2E7D32) // Deep Green
-        aqiValue <= 100 -> R.drawable.img_mid_air to Color(0xFFF57F17) // Deep Orange/Yellow
-        else -> R.drawable.img_air_pulluted to Color(0xFF37474F) // Dark Blue Grey/Polluted
+
+
+    val aqiValue = (homeState as? NetworkResponse.Success)?.data?.data?.aqi ?: 0
+
+
+    val (backgroundImage, systemBarColor, status) = when {
+        aqiValue <= 50 -> Triple(R.drawable.img_good_air, Color(0xFF2E7D32), "Good")
+        aqiValue <= 100 -> Triple(R.drawable.img_mid_air, Color(0xFFF57F17), "Not Healthy")
+        else -> Triple(R.drawable.img_air_pulluted, Color(0xFF37474F), "Unhealthy")
     }
 
     val view = LocalView.current
@@ -60,9 +64,9 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
 
 
     val towns = listOf("Dushanbe", "Khujand", "Bokhtar", "Kulob", "Istaravshan", "Panjakent", "Khorugh", "Tursunzoda", "Hisor")
-    val location = (homeState as? HomeState.Success)?.userLocation ?: "Dushanbe"
+    var location by remember { mutableStateOf( "Dushanbe")}
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(Unit, location) {
         viewModel.getCityAirData(location)
     }
     Box(modifier = Modifier.fillMaxSize()) {
@@ -97,6 +101,7 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                     }
                 }
                 is NetworkResponse.Success -> {
+                    val data = state.data.data
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -108,17 +113,20 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                         LocationHeader()
                         
                         Spacer(modifier = Modifier.height(24.dp))
+
+
+
                         
-                        AQIGauge(aqi = aqiValue, status = "Unhealthy", subStatus = "for Sensitive Groups")
+                        AQIGauge(aqi = aqiValue, status = status, subStatus = "")
                         
                         Spacer(modifier = Modifier.height(32.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            InfoCard(label = "PM2.5", value = "85", unit = "µg/m³", modifier = Modifier.weight(1f), icon = Icons.Default.Air)
-                            InfoCard(label = "PM10", value = "120", unit = "µg/m³", modifier = Modifier.weight(1f), icon = Icons.Default.Cloud)
-                            InfoCard(label = "Temperature", value = "28°C", unit = "", modifier = Modifier.weight(1f), icon = Icons.Default.WbSunny)
+                            InfoCard(label = "PM2.5", value = "${data.pm25}", unit = "µg/m³", modifier = Modifier.weight(1f), icon = Icons.Default.Air)
+                            InfoCard(label = "PM10", value = "${data.pm10}", unit = "µg/m³", modifier = Modifier.weight(1f), icon = Icons.Default.Cloud)
+                            InfoCard(label = "o3", value = "${data.o3}", unit = "", modifier = Modifier.weight(1f), icon = Icons.Default.FilterDrama)
                         }
                         
                         Spacer(modifier = Modifier.height(24.dp))
@@ -127,7 +135,7 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                         
                         Spacer(modifier = Modifier.height(24.dp))
                         
-                        MainPollutantCard(name = "PM2.5", value = 85, maxValue = 100)
+                        MainPollutantCard(name = "PM2.5", value = data.pm25.toInt(), maxValue = 100)
                         
                         Spacer(modifier = Modifier.height(80.dp))
                     }
@@ -137,9 +145,10 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                         Text(text = state.message, color = Color.White)
                     }
                 }
-                is NetworkResponse.Idle -> {
+                is NetworkResponse.Idle ->{
 
                 }
+
             }
         }
     }
@@ -155,8 +164,8 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    viewModel.getCityAirData(town)
                                     showLocationDialog = false
+                                    location = town
                                 }
                                 .padding(vertical = 12.dp, horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -221,47 +230,106 @@ fun LocationHeader() {
 }
 
 @Composable
-fun AQIGauge(aqi: Int, status: String, subStatus: String) {
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(230.dp)) {
-        Canvas(modifier = Modifier.size(220.dp)) {
+fun AQIGauge(
+    aqi: Int,
+    status: String,
+    subStatus: String
+) {
+
+    val maxAqi = 500f
+
+    // Convert AQI to angle
+    val targetSweepAngle = (aqi / maxAqi) * 270f
+
+    // Animation
+    val animatedSweepAngle by animateFloatAsState(
+        targetValue = targetSweepAngle,
+        animationSpec = tween(
+            durationMillis = 1500,
+            easing = FastOutSlowInEasing
+        ),
+        label = "AQI Animation"
+    )
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.size(230.dp)
+    ) {
+
+        Canvas(
+            modifier = Modifier.size(220.dp)
+        ) {
+
+            val strokeWidth = 20.dp.toPx()
+
+            // Background arc
             drawArc(
-                brush = Brush.sweepGradient(AQICircleGradient),
+                color = Color.DarkGray.copy(alpha = 0.25f),
                 startAngle = 135f,
                 sweepAngle = 270f,
                 useCenter = false,
-                style = Stroke(width = 20.dp.toPx(), cap = StrokeCap.Round)
+                style = Stroke(
+                    width = strokeWidth,
+                    cap = StrokeCap.Round
+                )
+            )
+
+            // Animated progress arc
+            drawArc(
+                color = getAQIColor(aqi),
+                startAngle = 135f,
+                sweepAngle = animatedSweepAngle,
+                useCenter = false,
+                style = Stroke(
+                    width = strokeWidth,
+                    cap = StrokeCap.Round
+                )
             )
         }
-        
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+
             Text(
                 text = status,
-                color = when {
-                    aqi <= 50 -> Color(0xFF22C55E)
-                    aqi <= 100 -> Color(0xFFEAB308)
-                    else -> Color(0xFFEF4444)
-                },
+                color = getAQIColor(aqi),
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold
             )
+
             Text(
                 text = subStatus,
-                color = TextSecondary,
+                color = Color.LightGray,
                 fontSize = 12.sp
             )
+
             Spacer(modifier = Modifier.height(8.dp))
+
             Text(
                 text = aqi.toString(),
-                color = TextPrimary,
+                color = Color.White,
                 fontSize = 64.sp,
                 fontWeight = FontWeight.Bold
             )
+
             Text(
                 text = "AQI",
-                color = TextSecondary,
+                color = Color.LightGray,
                 fontSize = 16.sp
             )
         }
+    }
+}
+
+fun getAQIColor(aqi: Int): Color {
+    return when (aqi) {
+        in 0..50 -> Color(0xFF00E400)      // Good
+        in 51..100 -> Color(0xFFFFFF00)   // Moderate
+        in 101..150 -> Color(0xFFFF7E00)  // Unhealthy for sensitive
+        in 151..200 -> Color(0xFFFF0000)  // Unhealthy
+        in 201..300 -> Color(0xFF8F3F97)  // Very unhealthy
+        else -> Color(0xFF7E0023)         // Hazardous
     }
 }
 
@@ -353,7 +421,14 @@ fun MainPollutantCard(name: String, value: Int, maxValue: Int) {
                     .fillMaxWidth(value.toFloat() / maxValue.toFloat())
                     .fillMaxHeight()
                     .clip(CircleShape)
-                    .background(Brush.horizontalGradient(listOf(Color(0xFF22C55E), Color(0xFFEF4444))))
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                Color(0xFF22C55E),
+                                Color(0xFFEF4444)
+                            )
+                        )
+                    )
             )
         }
         
