@@ -26,6 +26,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.smartairmonitoring.modul.core.navigation.Screen
 import com.example.smartairmonitoring.ui.ai.AIAssistantScreen
 import com.example.smartairmonitoring.ui.forecast.ForecastScreen
+import com.example.smartairmonitoring.ui.forecast.ForecastViewModel
 import com.example.smartairmonitoring.ui.home.HomeScreen
 import com.example.smartairmonitoring.ui.home.HomeViewModel
 import com.example.smartairmonitoring.ui.map.MapScreen
@@ -111,7 +112,16 @@ fun MainScreen(
                 MapScreen(onBackClick = { navController.popBackStack() }) 
             }
             composable(Screen.Forecast.route) { 
-                ForecastScreen(onBackClick = { navController.popBackStack() }) 
+                val context = LocalContext.current
+                val database = SmartAirDatabase.getDatabase(context)
+                val repository = AirPollRepository(RetrofitInstance.airPollApi, database.airPollDao())
+                val forecastViewModel: ForecastViewModel = viewModel(
+                    factory = ForecastViewModel.Factory(repository)
+                )
+                ForecastScreen(
+                    viewModel = forecastViewModel,
+                    onBackClick = { navController.popBackStack() }
+                )
             }
             composable(Screen.AIAssistant.route) { 
                 AIAssistantScreen(onBackClick = { navController.popBackStack() }) 
