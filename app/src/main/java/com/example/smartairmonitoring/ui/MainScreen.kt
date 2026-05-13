@@ -30,6 +30,7 @@ import com.example.smartairmonitoring.ui.forecast.ForecastViewModel
 import com.example.smartairmonitoring.ui.home.HomeScreen
 import com.example.smartairmonitoring.ui.home.HomeViewModel
 import com.example.smartairmonitoring.ui.map.MapScreen
+import com.example.smartairmonitoring.ui.map.MapViewModel
 import com.example.smartairmonitoring.ui.profile.ProfileScreen
 import com.example.smartairmonitoring.ui.profile.ProfileViewModel
 import com.example.smartairmonitoring.ui.theme.*
@@ -109,7 +110,16 @@ fun MainScreen(
                 }
             }
             composable(Screen.Map.route) { 
-                MapScreen(onBackClick = { navController.popBackStack() }) 
+                val context = LocalContext.current
+                val database = SmartAirDatabase.getDatabase(context)
+                val repository = AirPollRepository(RetrofitInstance.airPollApi, database.airPollDao())
+                val mapViewModel: MapViewModel = viewModel(
+                    factory = MapViewModel.Factory(repository)
+                )
+                MapScreen(
+                    viewModel = mapViewModel,
+                    onBackClick = { navController.popBackStack() }
+                )
             }
             composable(Screen.Forecast.route) { 
                 val context = LocalContext.current

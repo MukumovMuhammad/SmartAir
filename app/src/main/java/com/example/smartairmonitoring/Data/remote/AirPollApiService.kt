@@ -26,6 +26,11 @@ interface AirPollApiService {
         @Query("period") period: String = "today"
     ): ForecastResponse
 
+    @GET("/api/map/")
+    suspend fun getMapData(
+        @Query("pollutant") pollutant: String = "AQI"
+    ): MapResponse
+
     @GET("/api/advice/")
     suspend fun getAIAdvice(
         @Query("city") city: String = "Dushanbe",

@@ -1,5 +1,6 @@
 package com.example.smartairmonitoring.Data.repository
 
+import android.util.Log
 import com.example.smartairmonitoring.Data.local.AirPollDao
 import com.example.smartairmonitoring.Data.local.entities.AirPollData
 import com.example.smartairmonitoring.Data.local.entities.AirPollEntity
@@ -7,6 +8,7 @@ import com.example.smartairmonitoring.Data.remote.AirPollApiService
 import com.example.smartairmonitoring.Data.remote.dto.AIAdviceResponse
 import com.example.smartairmonitoring.Data.remote.dto.AirPollutionResponse
 import com.example.smartairmonitoring.Data.remote.dto.ForecastResponse
+import com.example.smartairmonitoring.Data.remote.dto.MapResponse
 import com.example.smartairmonitoring.Data.remote.dto.toEntity
 import com.example.smartairmonitoring.modul.core.network.NetworkResponse
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +38,17 @@ class AirPollRepository @Inject constructor(
             NetworkResponse.Success(response)
         } catch (e: Exception) {
             NetworkResponse.Error(e.message ?: "Failed to fetch forecast")
+        }
+    }
+
+    suspend fun getMapData(pollutant: String): NetworkResponse<MapResponse> {
+        Log.d("AirPollRepository", "API Call: getMapData(pollutant=$pollutant)")
+        return try {
+            val response = api.getMapData(pollutant)
+            NetworkResponse.Success(response)
+        } catch (e: Exception) {
+            Log.e("AirPollRepository", "API Error in getMapData", e)
+            NetworkResponse.Error(e.message ?: "Failed to fetch map data")
         }
     }
 

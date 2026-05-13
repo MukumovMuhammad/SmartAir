@@ -104,3 +104,27 @@ data class AIAdviceDataDto(
     @SerializedName("activity_level") val activityLevel: String,
     @SerializedName("advice") val advice: String
 )
+
+data class MapResponse(
+    @SerializedName("status") val status: String,
+    @SerializedName("data") val data: MapDataDto
+)
+
+data class MapDataDto(
+    @SerializedName("pollutant") val pollutant: String,
+    @SerializedName("cities") val cities: List<MapCityDto>
+)
+
+data class MapCityDto(
+    @SerializedName("city") val city: String,
+    @SerializedName("lat") val lat: Double,
+    @SerializedName("lon") val lon: Double,
+    @SerializedName("aqi") val aqi: Int? = null,
+    @SerializedName("aqi_label") val aqiLabel: String? = null,
+    @SerializedName("pm25") val pm25: Double? = null,
+    @SerializedName("pm10") val pm10: Double? = null,
+    @SerializedName("o3") val o3: Double? = null,
+    @SerializedName("no2") val no2: Double? = null,
+    @SerializedName("temperature") val temperature: Double? = null,
+    @SerializedName("error") val error: String? = null
+)

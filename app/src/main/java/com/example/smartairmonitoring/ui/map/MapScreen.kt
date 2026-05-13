@@ -1,7 +1,8 @@
 package com.example.smartairmonitoring.ui.map
 
-import android.graphics.Color.rgb
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -13,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,23 +21,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.smartairmonitoring.Data.remote.dto.MapCityDto
+import com.example.smartairmonitoring.modul.core.network.NetworkResponse
 import com.example.smartairmonitoring.ui.theme.*
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.extension.compose.MapEffect
 import com.mapbox.maps.extension.compose.MapboxMap
 import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
-import com.mapbox.maps.extension.compose.annotation.IconImage
-import com.mapbox.maps.extension.compose.annotation.generated.PointAnnotation
-import com.mapbox.maps.extension.compose.annotation.generated.PointAnnotationGroup
-import com.mapbox.maps.extension.compose.annotation.rememberIconImage
 import com.mapbox.maps.extension.compose.style.MapStyle
 import com.mapbox.maps.extension.style.expressions.dsl.generated.*
 import com.mapbox.maps.extension.style.expressions.generated.Expression.Companion.interpolate
@@ -46,23 +40,19 @@ import com.mapbox.maps.extension.style.layers.addLayer
 import com.mapbox.maps.extension.style.layers.generated.heatmapLayer
 import com.mapbox.maps.extension.style.layers.properties.generated.*
 import com.mapbox.maps.extension.style.sources.addSource
-import com.mapbox.maps.extension.style.sources.generated.GeoJsonSource
 import com.mapbox.maps.extension.style.sources.generated.geoJsonSource
-import com.mapbox.maps.extension.style.types.StyleTransition
-import com.mapbox.maps.plugin.annotation.AnnotationManager
-import com.mapbox.maps.plugin.annotation.generated.CircleAnnotation
-import com.mapbox.maps.plugin.annotation.generated.PointAnnotationManager
-import com.mapbox.maps.plugin.annotation.generated.PointAnnotationOptions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MapScreen(onBackClick: () -> Unit) {
-
+fun MapScreen(viewModel: MapViewModel, onBackClick: () -> Unit) {
     var selectedFilter by remember { mutableStateOf("AQI") }
     val filters = listOf("AQI", "PM2.5", "PM10", "O3", "NO2")
 
+    val mapState by viewModel.mapState.collectAsState()
+    val selectedCity by viewModel.selectedCity.collectAsState()
+
     var selectedMapStyle by remember { mutableStateOf("mapbox://styles/mapbox/standard") }
-    val FilterMaps = listOf(
+    val mapStyles = listOf(
         "mapbox://styles/mapbox/standard",
         "mapbox://styles/mapbox/dark-v11",
         "mapbox://styles/mapbox/streets-v12",
@@ -74,6 +64,10 @@ fun MapScreen(onBackClick: () -> Unit) {
             center(Point.fromLngLat(68.7791, 38.5358))
             zoom(6.5)
         }
+    }
+
+    LaunchedEffect(selectedFilter) {
+        viewModel.getMapData(selectedFilter)
     }
 
     Scaffold(
@@ -98,7 +92,7 @@ fun MapScreen(onBackClick: () -> Unit) {
                             onDismissRequest = { showStyleMenu = false },
                             modifier = Modifier.background(BackgroundSecondary)
                         ) {
-                            FilterMaps.forEach { style ->
+                            mapStyles.forEach { style ->
                                 val label = when {
                                     style.contains("satellite") -> "Satellite"
                                     style.contains("standard") -> "Standard"
@@ -124,15 +118,12 @@ fun MapScreen(onBackClick: () -> Unit) {
         },
         containerColor = BackgroundDeepNavy
     ) { padding ->
-
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-
-            // FILTERS (fixed)
+            // FILTERS
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -143,226 +134,243 @@ fun MapScreen(onBackClick: () -> Unit) {
                     FilterChip(
                         selected = selectedFilter == filter,
                         onClick = { selectedFilter = filter },
-                        label = { Text(filter) }
+                        label = { Text(filter) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AIAccent,
+                            selectedLabelColor = Color.White,
+                            labelColor = TextSecondary,
+                            containerColor = BackgroundSecondary
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            borderColor = Color.Transparent,
+                            enabled = true,
+                            selected = selectedFilter == filter
+                        )
                     )
                 }
             }
 
-            // 🗺️ MAP (FULLY INTERACTIVE)
+            // 🗺️ MAP
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.5f)
+                    .weight(1f)
             ) {
-                val points = listOf(
-                    Point.fromLngLat(68.8, 38.5),
-                    Point.fromLngLat(69.0, 38.6),
-                    Point.fromLngLat(68.6, 38.4)
-                )
                 MapboxMap(
                     modifier = Modifier.fillMaxSize(),
                     mapViewportState = mapViewportState,
-                    style = { MapStyle(selectedMapStyle) } // Base style (Satellite/Dark/etc)
+                    style = { MapStyle(selectedMapStyle) }
                 ) {
-                    // 1. Prepare your data
-                    val geoJsonData = """3
-{
-  "type": "FeatureCollection",
-  "features": [
-    { "type": "Feature", "properties": { "aqi": 210 }, "geometry": { "type": "Point", "coordinates": [68.78, 38.53] } },
-    { "type": "Feature", "properties": { "aqi": 180 }, "geometry": { "type": "Point", "coordinates": [68.85, 38.50] } },
-    { "type": "Feature", "properties": { "aqi": 150 }, "geometry": { "type": "Point", "coordinates": [68.70, 38.60] } },
-    { "type": "Feature", "properties": { "aqi": 90 }, "geometry": { "type": "Point", "coordinates": [68.40, 38.50] } },
-    { "type": "Feature", "properties": { "aqi": 120 }, "geometry": { "type": "Point", "coordinates": [69.20, 38.55] } },
-    
-    { "type": "Feature", "properties": { "aqi": 75 }, "geometry": { "type": "Point", "coordinates": [69.62, 40.28] } },
-    { "type": "Feature", "properties": { "aqi": 60 }, "geometry": { "type": "Point", "coordinates": [69.50, 40.10] } },
-    { "type": "Feature", "properties": { "aqi": 110 }, "geometry": { "type": "Point", "coordinates": [70.10, 40.00] } },
-    { "type": "Feature", "properties": { "aqi": 45 }, "geometry": { "type": "Point", "coordinates": [68.80, 39.50] } },
+                    if (mapState is NetworkResponse.Success) {
+                        val cities = (mapState as NetworkResponse.Success).data.data.cities
+                        val geoJson = createGeoJson(cities, selectedFilter)
 
-    
-    { "type": "Feature", "properties": { "aqi": 140 }, "geometry": { "type": "Point", "coordinates": [67.84, 37.83] } },
-    { "type": "Feature", "properties": { "aqi": 165 }, "geometry": { "type": "Point", "coordinates": [68.00, 37.50] } },
-    { "type": "Feature", "properties": { "aqi": 80 }, "geometry": { "type": "Point", "coordinates": [69.10, 37.90] } },
-    { "type": "Feature", "properties": { "aqi": 55 }, "geometry": { "type": "Point", "coordinates": [69.50, 37.30] } },
+                        MapEffect(geoJson, selectedMapStyle) { mapView ->
+                            mapView.mapboxMap.getStyle { style ->
+                                // Remove old source/layer if they exist
+                                style.removeStyleLayer("aqi-heat")
+                                style.removeStyleSource("aqi-source")
 
-  
-    { "type": "Feature", "properties": { "aqi": 30 }, "geometry": { "type": "Point", "coordinates": [71.55, 37.49] } },
-    { "type": "Feature", "properties": { "aqi": 25 }, "geometry": { "type": "Point", "coordinates": [72.50, 38.20] } },
-    { "type": "Feature", "properties": { "aqi": 20 }, "geometry": { "type": "Point", "coordinates": [73.50, 38.80] } },
-    { "type": "Feature", "properties": { "aqi": 40 }, "geometry": { "type": "Point", "coordinates": [74.50, 38.00] } }
-  ]
-}
-""".trimIndent()
+                                style.addSource(
+                                    geoJsonSource("aqi-source") {
+                                        data(geoJson)
+                                    }
+                                )
 
-
-                    // 2. Use MapEffect to add the source and layer manually
-                    MapEffect(selectedMapStyle) { mapView ->
-                        mapView.mapboxMap.getStyle { style ->
-                            // Add the data source
-                            style.addSource(
-                                geoJsonSource("aqi-source") {
-                                    data(geoJsonData)
-                                }
-                            )
-
-                            // Add the heatmap layer
-                            style.addLayer(
-                                heatmapLayer("aqi-heat", "aqi-source") {
-                                    // Normalize weight: AQI 300 = weight 1.0
-                                    heatmapWeight(
-                                        interpolate {
-                                            linear()
-                                            get("aqi")
-                                            stop { literal(0.0); literal(0.0) }
-                                            stop { literal(300.0); literal(1.0) }
-                                        }
-                                    )
-                                    
-                                    heatmapRadius(
-                                        interpolate {
-                                            linear()
-                                            zoom()
-                                            stop { literal(5.0); literal(20.0) }
-                                            stop { literal(12.0); literal(80.0) }
-                                        }
-                                    )
-
-                                    // Intensity 1.0 ensures a single max-weight point reaches max density
-                                    heatmapIntensity(1.0)
-
-                                    heatmapOpacity(0.8)
-                                    // Color ramp mapped to the normalized AQI scale (0-300)
-                                    // 50/300 ≈ 0.16, 100/300 ≈ 0.33, 150/300 ≈ 0.5, 200/300 ≈ 0.66
-                                    heatmapColor(
-                                        interpolate {
-                                            linear()
-                                            heatmapDensity()
-                                            stop { literal(0.0); rgba(0.0, 0.0, 0.0, 0.0) }
-                                            stop { literal(0.16); rgb(34.0, 197.0, 94.0) }   // Good (50)
-                                            stop { literal(0.33); rgb(234.0, 179.0, 8.0) }   // Moderate (100)
-                                            stop { literal(0.5); rgb(249.0, 115.0, 22.0) }   // Sensitive (150)
-                                            stop { literal(0.66); rgb(239.0, 68.0, 68.0) }   // Unhealthy (200)
-                                            stop { literal(1.0); rgb(168.0, 85.0, 247.0) }   // Hazardous (300+)
-                                        }
-                                    )
-                                }
-                            )
+                                style.addLayer(
+                                    heatmapLayer("aqi-heat", "aqi-source") {
+                                        heatmapWeight(
+                                            interpolate {
+                                                linear()
+                                                get("value")
+                                                stop { literal(0.0); literal(0.0) }
+                                                stop { literal(300.0); literal(1.0) }
+                                            }
+                                        )
+                                        heatmapRadius(
+                                            interpolate {
+                                                linear()
+                                                zoom()
+                                                stop { literal(5.0); literal(20.0) }
+                                                stop { literal(12.0); literal(80.0) }
+                                            }
+                                        )
+                                        heatmapIntensity(1.0)
+                                        heatmapOpacity(0.8)
+                                        heatmapColor(
+                                            interpolate {
+                                                linear()
+                                                heatmapDensity()
+                                                stop { literal(0.0); rgba(0.0, 0.0, 0.0, 0.0) }
+                                                stop { literal(0.16); rgb(34.0, 197.0, 94.0) }   // Good
+                                                stop { literal(0.33); rgb(234.0, 179.0, 8.0) }   // Moderate
+                                                stop { literal(0.5); rgb(249.0, 115.0, 22.0) }   // Sensitive
+                                                stop { literal(0.66); rgb(239.0, 68.0, 68.0) }   // Unhealthy
+                                                stop { literal(1.0); rgb(168.0, 85.0, 247.0) }   // Hazardous
+                                            }
+                                        )
+                                    }
+                                )
+                            }
                         }
                     }
                 }
 
-
                 FloatingActionButton(
                     onClick = {
-                        mapViewportState.flyTo(
-                            CameraOptions.Builder()
-                                .center(Point.fromLngLat(68.7791, 38.5358)) // new location
-                                .zoom(8.0)
-                                .build()
-                        )
+                        selectedCity?.let {
+                            mapViewportState.flyTo(
+                                CameraOptions.Builder()
+                                    .center(Point.fromLngLat(it.lon, it.lat))
+                                    .zoom(10.0)
+                                    .build()
+                            )
+                        }
                     },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(16.dp)
+                        .padding(16.dp),
+                    containerColor = AIAccent,
+                    contentColor = Color.White
                 ) {
                     Icon(Icons.Default.Navigation, contentDescription = null)
                 }
             }
 
-            // 🔻 SCROLLABLE PART ONLY HERE
+            // DETAILS & LEGEND
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp) // 👈 fixed height
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 LegendCard()
-                LocationDetailCard()
-
+                
+                when (val state = mapState) {
+                    is NetworkResponse.Loading -> {
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = AIAccent)
+                        }
+                    }
+                    is NetworkResponse.Success -> {
+                        state.data.data.cities.forEach { city ->
+                            LocationDetailCard(
+                                city = city,
+                                isSelected = selectedCity?.city == city.city,
+                                onClick = { viewModel.selectCity(city) }
+                            )
+                        }
+                    }
+                    is NetworkResponse.Error -> {
+                        Text(state.message, color = Color.Red)
+                    }
+                    else -> {}
+                }
             }
         }
     }
-
-
 }
 
-
+fun createGeoJson(cities: List<MapCityDto>, pollutant: String): String {
+    val features = cities.filter { it.error == null }.joinToString(",") { city ->
+        val value = when (pollutant) {
+            "AQI" -> city.aqi
+            "PM2.5" -> city.pm25
+            "PM10" -> city.pm10
+            "O3" -> city.o3
+            "NO2" -> city.no2
+            else -> city.aqi
+        } ?: 0.0
+        """
+        {
+          "type": "Feature",
+          "properties": { "value": $value },
+          "geometry": { "type": "Point", "coordinates": [${city.lon}, ${city.lat}] }
+        }
+        """.trimIndent()
+    }
+    return """
+    {
+      "type": "FeatureCollection",
+      "features": [ $features ]
+    }
+    """.trimIndent()
+}
 
 @Composable
-fun LocationDetailCard() {
+fun LocationDetailCard(city: MapCityDto, isSelected: Boolean, onClick: () -> Unit) {
     Surface(
-        color = BackgroundSecondary,
+        color = if (isSelected) BackgroundElevated else BackgroundSecondary,
         shape = RoundedCornerShape(20.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        border = if (isSelected) BorderStroke(1.dp, AIAccent) else null
     ) {
         Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
+            modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val aqiColor = when (city.aqi ?: 0) {
+                in 0..50 -> Color(0xFF22C55E)
+                in 51..100 -> Color(0xFFEAB308)
+                else -> Color(0xFFEF4444)
+            }
 
-            // 🔴 AQI Indicator Dot
             Box(
                 modifier = Modifier
                     .size(10.dp)
                     .clip(CircleShape)
-                    .background(AQIUnhealthy)
+                    .background(aqiColor)
             )
 
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "Dushanbe",
+                        city.city,
                         color = TextPrimary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
                     )
-
                     Spacer(modifier = Modifier.weight(1f))
-
-                    Surface(
-                        color = AQIUnhealthy.copy(alpha = 0.8f),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            "AQI 165",
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
+                    if (city.error != null) {
+                        Text("Unavailable", color = TextHint, fontSize = 12.sp)
+                    } else {
+                        Surface(
+                            color = aqiColor.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                "AQI ${city.aqi}",
+                                color = aqiColor,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    "Unhealthy for Sensitive Groups",
-                    color = TextSecondary,
-                    fontSize = 14.sp
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    "PM2.5 85 µg/m³  •  28°C",
-                    color = TextHint,
-                    fontSize = 13.sp
-                )
+                if (city.error == null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        city.aqiLabel ?: "",
+                        color = TextSecondary,
+                        fontSize = 14.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "PM2.5 ${city.pm25} µg/m³  •  ${city.temperature}°C",
+                        color = TextHint,
+                        fontSize = 13.sp
+                    )
+                }
             }
 
-            Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = TextHint
-            )
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextHint)
         }
     }
 }
@@ -375,7 +383,6 @@ fun LegendCard() {
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -384,44 +391,24 @@ fun LegendCard() {
                     .background(
                         Brush.horizontalGradient(
                             listOf(
-                                AQIGood,
-                                AQIModerate,
-                                AQIUnhealthySensitive,
-                                AQIUnhealthy,
-                                AQIHazardous
+                                Color(0xFF22C55E),
+                                Color(0xFFEAB308),
+                                Color(0xFFF97316),
+                                Color(0xFFEF4444),
+                                Color(0xFFA855F7)
                             )
                         )
                     )
             )
-
             Spacer(modifier = Modifier.height(8.dp))
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 listOf("0", "50", "100", "150", "200", "300+").forEach {
-                    Text(
-                        it,
-                        color = TextPrimary,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Text(it, color = TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
                 }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("Good", color = TextSecondary, fontSize = 10.sp)
-                Text("Moderate", color = TextSecondary, fontSize = 10.sp)
-                Text("Unhealthy", color = TextSecondary, fontSize = 10.sp)
-                Text("Hazardous", color = TextSecondary, fontSize = 10.sp)
             }
         }
     }
 }
-

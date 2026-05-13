@@ -1,5 +1,6 @@
 package com.example.smartairmonitoring.ui.forecast
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -14,14 +15,23 @@ class ForecastViewModel(
     private val repo: AirPollRepository
 ) : ViewModel() {
 
+    private val TAG = "ForecastViewModel_TAG"
+
     private val _forecastState = MutableStateFlow<NetworkResponse<ForecastResponse>>(NetworkResponse.Idle)
     val forecastState = _forecastState.asStateFlow()
 
     fun getForecast(city: String, period: String) {
+        Log.i(TAG, "Fetching forecast for city: $city, period: $period")
         viewModelScope.launch {
             _forecastState.value = NetworkResponse.Loading
             val result = repo.getForecast(city, period)
             _forecastState.value = result
+            
+            if (result is NetworkResponse.Success) {
+                Log.d(TAG, "Forecast fetched successfully for $city")
+            } else if (result is NetworkResponse.Error) {
+                Log.e(TAG, "Error fetching forecast: ${result.message}")
+            }
         }
     }
 
