@@ -7,7 +7,11 @@ import com.example.smartairmonitoring.Data.remote.AirPollApiService
 import com.example.smartairmonitoring.Data.remote.dto.AIAdviceResponse
 import com.example.smartairmonitoring.Data.remote.dto.AirPollutionResponse
 import com.example.smartairmonitoring.Data.remote.dto.ForecastResponse
+import com.example.smartairmonitoring.Data.remote.dto.toEntity
+import com.example.smartairmonitoring.modul.core.network.NetworkResponse
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 class AirPollRepository @Inject constructor(
@@ -16,49 +20,31 @@ class AirPollRepository @Inject constructor(
 ) {
     fun getLocalHistory(): Flow<List<AirPollEntity>> = dao.getAllHistory()
 
-    suspend fun fetchAndSaveCurrentAirPoll(city: String = "Dushanbe"): Result<AirPollutionResponse> {
-        return try {
+    suspend fun fetchAndSaveCurrentAirPoll(city: String = "Dushanbe"): NetworkResponse<Unit> = withContext(Dispatchers.IO) {
+        try {
             val response = api.getAirPollData(city)
-            // Convert DTO to Entity and save to Room
-            val entity = AirPollEntity(
-                city = response.city,
-                data = AirPollData(
-                    lat = response.data.lat,
-                    lon = response.data.lon,
-                    pm25 = response.data.pm25,
-                    pm10 = response.data.pm10,
-                    no2 = response.data.no2,
-                    no = response.data.no,
-                    o3 = response.data.o3,
-                    so2 = response.data.so2,
-                    co = response.data.co,
-                    nh3 = response.data.nh3,
-                    aqi = response.data.aqi,
-                    dt = response.data.dt
-                )
-            )
-            dao.insertAirPollution(entity)
-            Result.success(response)
+            dao.insertAirPollution(response.toEntity())
+            NetworkResponse.Success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            NetworkResponse.Error(e.message ?: "Failed to fetch air pollution data")
         }
     }
 
-    suspend fun getForecast(city: String, period: String): Result<ForecastResponse> {
+    suspend fun getForecast(city: String, period: String): NetworkResponse<ForecastResponse> {
         return try {
             val response = api.getForecast(city, period)
-            Result.success(response)
+            NetworkResponse.Success(response)
         } catch (e: Exception) {
-            Result.failure(e)
+            NetworkResponse.Error(e.message ?: "Failed to fetch forecast")
         }
     }
 
-    suspend fun getAIAdvice(city: String, healthCondition: String, activityLevel: String): Result<AIAdviceResponse> {
+    suspend fun getAIAdvice(city: String, healthCondition: String, activityLevel: String): NetworkResponse<AIAdviceResponse> {
         return try {
             val response = api.getAIAdvice(city, healthCondition, activityLevel)
-            Result.success(response)
+            NetworkResponse.Success(response)
         } catch (e: Exception) {
-            Result.failure(e)
+            NetworkResponse.Error(e.message ?: "Failed to get AI advice")
         }
     }
 }

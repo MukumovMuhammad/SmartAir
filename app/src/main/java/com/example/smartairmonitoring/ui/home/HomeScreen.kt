@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.example.smartairmonitoring.R
+import com.example.smartairmonitoring.modul.core.network.NetworkResponse
 import com.example.smartairmonitoring.ui.components.shimmerEffect
 import com.example.smartairmonitoring.ui.theme.*
 
@@ -56,8 +57,14 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
         }
     }
 
-    val towns = listOf("Dushanbe", "Khujand", "Bokhtar", "Kulob", "Istaravshan", "Panjakent", "Khorugh", "Tursunzoda", "Hisor")
 
+
+    val towns = listOf("Dushanbe", "Khujand", "Bokhtar", "Kulob", "Istaravshan", "Panjakent", "Khorugh", "Tursunzoda", "Hisor")
+    val location = (homeState as? HomeState.Success)?.userLocation ?: "Dushanbe"
+
+    LaunchedEffect(Unit) {
+        viewModel.getCityAirData(location)
+    }
     Box(modifier = Modifier.fillMaxSize()) {
         // Dynamic Background Image
         Image(
@@ -76,7 +83,6 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
 
         Scaffold(
             topBar = { 
-                val location = (homeState as? HomeState.Success)?.userLocation ?: "Dushanbe"
                 HomeTopBar(
                     location = location,
                     onLocationClick = { showLocationDialog = true }
@@ -85,12 +91,12 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
             containerColor = Color.Transparent
         ) { padding ->
             when (val state = homeState) {
-                is HomeState.Loading -> {
+                is NetworkResponse.Loading -> {
                     Box(modifier = Modifier.padding(padding)) {
                         HomeShimmer()
                     }
                 }
-                is HomeState.Success -> {
+                is NetworkResponse.Success -> {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -126,10 +132,13 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                         Spacer(modifier = Modifier.height(80.dp))
                     }
                 }
-                is HomeState.Error -> {
+                is NetworkResponse.Error -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(text = state.message, color = Color.White)
                     }
+                }
+                is NetworkResponse.Idle -> {
+
                 }
             }
         }
@@ -146,7 +155,7 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    viewModel.updateLocation(town)
+                                    viewModel.getCityAirData(town)
                                     showLocationDialog = false
                                 }
                                 .padding(vertical = 12.dp, horizontal = 8.dp),

@@ -1,3 +1,5 @@
+package com.example.smartairmonitoring.modul.core.network
+
 import com.example.smartairmonitoring.Data.remote.AirPollApiService
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory

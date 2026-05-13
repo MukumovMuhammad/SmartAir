@@ -1,5 +1,7 @@
 package com.example.smartairmonitoring.Data.remote.dto
 
+import com.example.smartairmonitoring.Data.local.entities.AirPollData
+import com.example.smartairmonitoring.Data.local.entities.AirPollEntity
 import com.google.gson.annotations.SerializedName
 
 data class AirPollutionResponse(
@@ -8,6 +10,26 @@ data class AirPollutionResponse(
     @SerializedName("city") val city: String,
     @SerializedName("data") val data: AirPollutionDataDto
 )
+
+fun AirPollutionResponse.toEntity(): AirPollEntity {
+    return AirPollEntity(
+        city = this.city,
+        data = AirPollData(
+            lat = this.data.lat,
+            lon = this.data.lon,
+            pm25 = this.data.pm25,
+            pm10 = this.data.pm10,
+            no2 = this.data.no2,
+            no = this.data.no,
+            o3 = this.data.o3,
+            so2 = this.data.so2,
+            co = this.data.co,
+            nh3 = this.data.nh3,
+            aqi = this.data.aqi,
+            dt = this.data.dt
+        )
+    )
+}
 
 data class AirPollutionDataDto(
     @SerializedName("lat") val lat: Double,

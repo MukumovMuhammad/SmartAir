@@ -25,3 +25,5 @@ data class AirPollData(
     val aqi: Int,
     val dt: String
 )
+
+
