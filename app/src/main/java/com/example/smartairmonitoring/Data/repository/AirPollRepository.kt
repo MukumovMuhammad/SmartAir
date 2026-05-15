@@ -4,6 +4,7 @@ import android.util.Log
 import com.example.smartairmonitoring.Data.local.AirPollDao
 import com.example.smartairmonitoring.Data.local.entities.AirPollData
 import com.example.smartairmonitoring.Data.local.entities.AirPollEntity
+import com.example.smartairmonitoring.Data.local.entities.ForecastEntity
 import com.example.smartairmonitoring.Data.remote.AirPollApiService
 import com.example.smartairmonitoring.Data.remote.dto.AIAdviceResponse
 import com.example.smartairmonitoring.Data.remote.dto.AirPollutionResponse
@@ -22,6 +23,8 @@ class AirPollRepository @Inject constructor(
 ) {
     fun getLocalHistory(): Flow<List<AirPollEntity>> = dao.getAllHistory()
 
+    fun getLocalPollution(city: String): Flow<AirPollEntity?> = dao.getPollutionByCity(city)
+
     suspend fun fetchAndSaveCurrentAirPoll(city: String = "Dushanbe"): NetworkResponse<AirPollEntity> = withContext(Dispatchers.IO) {
         try {
             val response = api.getAirPollData(city)
@@ -35,11 +38,26 @@ class AirPollRepository @Inject constructor(
     suspend fun getForecast(city: String, period: String): NetworkResponse<ForecastResponse> {
         return try {
             val response = api.getForecast(city, period)
+            // Save to Room
+            val entity = ForecastEntity(
+                id = "${city}_${period}",
+                city = city,
+                period = period,
+                maxAqi = response.data.maxAqi,
+                maxAqiLabel = response.data.maxAqiLabel,
+                maxPm25 = response.data.maxPm25,
+                forecastPoints = response.data.forecastPoints
+            )
+            dao.insertForecast(entity)
             NetworkResponse.Success(response)
         } catch (e: Exception) {
+            Log.e("AirPollRepository", "Error fetching forecast", e)
             NetworkResponse.Error(e.message ?: "Failed to fetch forecast")
         }
     }
+
+    fun getLocalForecast(city: String, period: String): Flow<ForecastEntity?> = 
+        dao.getForecast(city, period)
 
     suspend fun getMapData(pollutant: String): NetworkResponse<MapResponse> {
         Log.d("AirPollRepository", "API Call: getMapData(pollutant=$pollutant)")

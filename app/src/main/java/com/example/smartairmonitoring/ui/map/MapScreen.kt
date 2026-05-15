@@ -1,7 +1,10 @@
 package com.example.smartairmonitoring.ui.map
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -254,12 +257,25 @@ fun MapScreen(viewModel: MapViewModel, onBackClick: () -> Unit) {
                         }
                     }
                     is NetworkResponse.Success -> {
-                        state.data.data.cities.forEach { city ->
-                            LocationDetailCard(
-                                city = city,
-                                isSelected = selectedCity?.city == city.city,
-                                onClick = { viewModel.selectCity(city) }
-                            )
+                        state.data.data.cities.forEachIndexed { index, city ->
+                            var visible by remember { mutableStateOf(false) }
+                            LaunchedEffect(Unit) {
+                                delay(index * 100L)
+                                visible = true
+                            }
+                            
+                            AnimatedVisibility(
+                                visible = visible,
+                                enter = fadeIn(animationSpec = tween(500)) + slideInVertically(
+                                    animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy)
+                                ) { it / 2 }
+                            ) {
+                                LocationDetailCard(
+                                    city = city,
+                                    isSelected = selectedCity?.city == city.city,
+                                    onClick = { viewModel.selectCity(city) }
+                                )
+                            }
                         }
                     }
                     is NetworkResponse.Error -> {

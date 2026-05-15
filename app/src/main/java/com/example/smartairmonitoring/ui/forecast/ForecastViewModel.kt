@@ -5,10 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.smartairmonitoring.Data.repository.AirPollRepository
+import com.example.smartairmonitoring.Data.remote.dto.ForecastDataDto
 import com.example.smartairmonitoring.Data.remote.dto.ForecastResponse
 import com.example.smartairmonitoring.modul.core.network.NetworkResponse
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class ForecastViewModel(
@@ -20,17 +23,41 @@ class ForecastViewModel(
     private val _forecastState = MutableStateFlow<NetworkResponse<ForecastResponse>>(NetworkResponse.Idle)
     val forecastState = _forecastState.asStateFlow()
 
+    private var forecastJob: Job? = null
+
     fun getForecast(city: String, period: String) {
         Log.i(TAG, "Fetching forecast for city: $city, period: $period")
-        viewModelScope.launch {
-            _forecastState.value = NetworkResponse.Loading
+        
+        forecastJob?.cancel()
+        _forecastState.value = NetworkResponse.Loading
+
+        forecastJob = viewModelScope.launch {
+            // Observe local database for changes
+            launch {
+                repo.getLocalForecast(city, period).collect { cached ->
+                    if (cached != null) {
+                        Log.d(TAG, "Displaying cached forecast for $city, period: $period")
+                        val response = ForecastResponse(
+                            status = "success",
+                            data = ForecastDataDto(
+                                city = cached.city,
+                                period = cached.period,
+                                maxAqi = cached.maxAqi,
+                                maxAqiLabel = cached.maxAqiLabel,
+                                maxPm25 = cached.maxPm25,
+                                forecastPoints = cached.forecastPoints
+                            )
+                        )
+                        _forecastState.value = NetworkResponse.Success(response)
+                    }
+                }
+            }
+
+            // Fetch from network
             val result = repo.getForecast(city, period)
-            _forecastState.value = result
-            
-            if (result is NetworkResponse.Success) {
-                Log.d(TAG, "Forecast fetched successfully for $city")
-            } else if (result is NetworkResponse.Error) {
+            if (result is NetworkResponse.Error && _forecastState.value !is NetworkResponse.Success) {
                 Log.e(TAG, "Error fetching forecast: ${result.message}")
+                _forecastState.value = result
             }
         }
     }

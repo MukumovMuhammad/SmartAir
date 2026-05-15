@@ -1,6 +1,12 @@
 package com.example.smartairmonitoring.ui.forecast
 
+import android.annotation.SuppressLint
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.*
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -114,76 +120,78 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBackClick: () -> Unit) {
                 }
             }
 
-            when (val state = forecastState) {
-                is NetworkResponse.Loading -> {
-                    Box(modifier = Modifier.fillMaxWidth().height(300.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = AIAccent)
+            key(selectedTab) {
+                when (val state = forecastState) {
+                    is NetworkResponse.Loading -> {
+                        Box(modifier = Modifier.fillMaxWidth().height(300.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = AIAccent)
+                        }
                     }
-                }
-                is NetworkResponse.Success -> {
-                    val data = state.data.data
-                    
-                    // Filter "Today" data to start from "Now" and only next 12 hours if possible
-                    val displayPoints = if (selectedTab == "Today") {
-                        filterTodayPoints(data.forecastPoints)
-                    } else {
-                        data.forecastPoints
-                    }
+                    is NetworkResponse.Success -> {
+                        val data = state.data.data
+                        
+                        // Filter "Today" data to start from "Now" and only next 12 hours if possible
+                        val displayPoints = if (selectedTab == "Today") {
+                            filterTodayPoints(data.forecastPoints)
+                        } else {
+                            data.forecastPoints
+                        }
 
-                    // HERO SECTION
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                selectedTab,
-                                color = TextSecondary,
-                                fontSize = 16.sp
-                            )
-                            Text(
-                                data.maxAqiLabel,
-                                color = getAQIColorFromLabel(data.maxAqiLabel),
-                                fontSize = 32.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                "AQI may reach ${data.maxAqi}",
-                                color = TextHint,
-                                fontSize = 14.sp
+                        // HERO SECTION
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(
+                                    selectedTab,
+                                    color = TextSecondary,
+                                    fontSize = 16.sp
+                                )
+                                Text(
+                                    data.maxAqiLabel,
+                                    color = getAQIColorFromLabel(data.maxAqiLabel),
+                                    fontSize = 32.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    "AQI may reach ${data.maxAqi}",
+                                    color = TextHint,
+                                    fontSize = 14.sp
+                                )
+                            }
+                            
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = getAQIColorFromLabel(data.maxAqiLabel),
+                                modifier = Modifier.size(64.dp)
                             )
                         }
-                        
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = null,
-                            tint = getAQIColorFromLabel(data.maxAqiLabel),
-                            modifier = Modifier.size(64.dp)
-                        )
-                    }
 
-                    // CHART SECTION
-                    ForecastChartCard(displayPoints, data.maxAqiLabel, isToday = selectedTab == "Today")
+                        // CHART SECTION
+                        ForecastChartCard(displayPoints, data.maxAqiLabel, isToday = selectedTab == "Today")
 
-                    // DAILY OVERVIEW
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(
-                            if (selectedTab == "7 Days") "7 Days Forecast" else "Daily Overview",
-                            color = TextPrimary,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        
-                        DailyOverviewCard(displayPoints)
+                        // DAILY OVERVIEW
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(
+                                if (selectedTab == "7 Days") "7 Days Forecast" else "Daily Overview",
+                                color = TextPrimary,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            
+                            DailyOverviewCard(displayPoints)
+                        }
                     }
-                }
-                is NetworkResponse.Error -> {
-                    Box(modifier = Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
-                        Text(text = state.message, color = Color.Red)
+                    is NetworkResponse.Error -> {
+                        Box(modifier = Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
+                            Text(text = state.message, color = Color.Red)
+                        }
                     }
+                    else -> {}
                 }
-                else -> {}
             }
         }
     }
@@ -220,8 +228,21 @@ fun getAQIColorFromLabel(label: String): Color {
     }
 }
 
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun ForecastChartCard(points: List<ForecastPointDto>, maxLabel: String, isToday: Boolean) {
+    var animationPlayed by remember { mutableStateOf(false) }
+    val curProgress by animateFloatAsState(
+        targetValue = if (animationPlayed) 1f else 0f,
+        animationSpec = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
+        label = "ChartAnimation"
+    )
+    LaunchedEffect(points) {
+        animationPlayed = false
+        delay(100)
+        animationPlayed = true
+    }
+
     Surface(
         color = BackgroundSecondary,
         shape = RoundedCornerShape(24.dp),
@@ -263,8 +284,6 @@ fun ForecastChartCard(points: List<ForecastPointDto>, maxLabel: String, isToday:
                     
                     val avgVal = points.map { it.pm25 }.average().toFloat()
                     val maxData = points.maxOfOrNull { it.pm25 }?.toFloat() ?: 0f
-                    // To put average in middle, max should be 2 * average
-                    // But we must also ensure we don't cut off the peak
                     val maxVal = maxOf(avgVal * 2f, maxData * 1.2f).coerceAtLeast(10f)
                     val stepX = width / (points.size - 1).coerceAtLeast(1)
 
@@ -277,81 +296,110 @@ fun ForecastChartCard(points: List<ForecastPointDto>, maxLabel: String, isToday:
                             Offset(x, y)
                         }
 
-                        // DRAW AREA GRADIENT
+                        // DRAW AREA GRADIENT (Animated)
                         val fillPath = Path().apply {
                             moveTo(pointsArr.first().x, topPadding + chartHeight)
                             pointsArr.forEach { lineTo(it.x, it.y) }
                             lineTo(pointsArr.last().x, topPadding + chartHeight)
                             close()
                         }
+                        
+                        // Use clipPath or just scale? Truncating the path is better for "draw-in"
+                        // For simplicity, we can use graphicsLayer or just draw a subset of points
+                        // Actually, using path.draw-in via measure/segment is advanced, let's use a simpler "reveal" with alpha and clipping
+                        
                         drawPath(
                             path = fillPath,
                             brush = Brush.verticalGradient(
                                 colors = listOf(
-                                    chartColor.copy(alpha = 0.3f),
+                                    chartColor.copy(alpha = 0.3f * curProgress),
                                     Color.Transparent
                                 )
                             )
                         )
 
-                        // DRAW LINE
+                        // DRAW LINE (Segmented based on progress)
                         val linePath = Path().apply {
-                            moveTo(pointsArr.first().x, pointsArr.first().y)
-                            for (i in 1 until pointsArr.size) {
-                                lineTo(pointsArr[i].x, pointsArr[i].y)
+                            if (pointsArr.isNotEmpty()) {
+                                moveTo(pointsArr.first().x, pointsArr.first().y)
+                                val pointsToDraw = (pointsArr.size * curProgress).toInt().coerceAtLeast(1)
+                                for (i in 1 until pointsToDraw) {
+                                    lineTo(pointsArr[i].x, pointsArr[i].y)
+                                }
+                                // Interpolate the last segment
+                                if (pointsToDraw < pointsArr.size) {
+                                    val lastPoint = pointsArr[pointsToDraw - 1]
+                                    val nextPoint = pointsArr[pointsToDraw]
+                                    val localProgress = (pointsArr.size * curProgress) - pointsToDraw
+                                    val intermediateX = lastPoint.x + (nextPoint.x - lastPoint.x) * localProgress
+                                    val intermediateY = lastPoint.y + (nextPoint.y - lastPoint.y) * localProgress
+                                    lineTo(intermediateX, intermediateY)
+                                }
                             }
                         }
+                        
                         drawPath(
                             path = linePath,
                             color = chartColor,
                             style = Stroke(width = 3.dp.toPx())
                         )
 
-                        // DRAW POINTS
-                        pointsArr.forEach { offset ->
-                            drawCircle(
-                                color = chartColor,
-                                radius = 4.dp.toPx(),
-                                center = offset
-                            )
+                        // DRAW POINTS (Fade in one by one)
+                        pointsArr.forEachIndexed { index, offset ->
+                            val pointThreshold = index.toFloat() / pointsArr.size.toFloat()
+                            if (curProgress > pointThreshold) {
+                                drawCircle(
+                                    color = chartColor,
+                                    radius = 4.dp.toPx(),
+                                    center = offset,
+                                    alpha = ((curProgress - pointThreshold) * 5f).coerceIn(0f, 1f)
+                                )
+                            }
                         }
                     }
                     
-                    // DRAW LABELS
+                    // DRAW LABELS (Fade in)
                     points.forEachIndexed { index, point ->
-                        val x = (index * stepX)
-                        val y = topPadding + chartHeight - (point.pm25.toFloat() / maxVal * chartHeight)
-                        
-                        // Value Label
-                        Text(
-                            text = point.pm25.toInt().toString(),
-                            color = TextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .graphicsLayer(
-                                    translationX = x - 20f,
-                                    translationY = y - 60f
-                                )
-                        )
-                        
-                        // Time/Date Label
-                        val label = if (isToday && index == 0) "Now" else {
-                            formatTimeLabel(point, isToday)
-                        }
+                        val pointThreshold = index.toFloat() / points.size.toFloat()
+                        if (curProgress > pointThreshold) {
+                            val x = (index * stepX)
+                            val y = topPadding + chartHeight - (point.pm25.toFloat() / maxVal * chartHeight)
+                            
+                            val labelAlpha = ((curProgress - pointThreshold) * 5f).coerceIn(0f, 1f)
+                            
+                            // Value Label
+                            Text(
+                                text = point.pm25.toInt().toString(),
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .graphicsLayer(
+                                        alpha = labelAlpha,
+                                        translationX = x - 20f,
+                                        translationY = y - 60f
+                                    )
+                            )
+                            
+                            // Time/Date Label
+                            val label = if (isToday && index == 0) "Now" else {
+                                formatTimeLabel(point, isToday)
+                            }
 
-                        Text(
-                            text = label,
-                            color = TextHint,
-                            fontSize = 11.sp,
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .graphicsLayer(
-                                    translationX = x - 30f,
-                                    translationY = topPadding + chartHeight + 25f
-                                )
-                        )
+                            Text(
+                                text = label,
+                                color = TextHint,
+                                fontSize = 11.sp,
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .graphicsLayer(
+                                        alpha = labelAlpha,
+                                        translationX = x - 30f,
+                                        translationY = topPadding + chartHeight + 25f
+                                    )
+                            )
+                        }
                     }
                 }
             }
@@ -396,49 +444,60 @@ fun DailyOverviewCard(points: List<ForecastPointDto>) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             points.forEachIndexed { index, item ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                var visible by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) {
+                    delay(index * 100L) // Staggered delay
+                    visible = true
+                }
+
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(animationSpec = tween(500)) + slideInHorizontally(initialOffsetX = { 50 })
                 ) {
-                    val label = formatOverviewLabel(item)
-                    Text(
-                        text = label,
-                        color = TextPrimary,
-                        modifier = Modifier.weight(1f),
-                        fontSize = 14.sp
-                    )
-                    
                     Row(
-                        modifier = Modifier.weight(1.2f),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val color = getAQIColorFromLabel(item.aqiLabel)
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        val label = formatOverviewLabel(item)
                         Text(
-                            text = item.aqiLabel,
-                            color = TextSecondary,
-                            fontSize = 13.sp,
-                            maxLines = 1
+                            text = label,
+                            color = TextPrimary,
+                            modifier = Modifier.weight(1f),
+                            fontSize = 14.sp
+                        )
+                        
+                        Row(
+                            modifier = Modifier.weight(1.2f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            val color = getAQIColorFromLabel(item.aqiLabel)
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = item.aqiLabel,
+                                color = TextSecondary,
+                                fontSize = 13.sp,
+                                maxLines = 1
+                            )
+                        }
+                        
+                        Text(
+                            text = item.aqi.toString(),
+                            color = TextPrimary,
+                            modifier = Modifier.weight(1f),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
                         )
                     }
-                    
-                    Text(
-                        text = item.aqi.toString(),
-                        color = TextPrimary,
-                        modifier = Modifier.weight(1f),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
-                    )
                 }
                 
                 if (index < points.size - 1) {

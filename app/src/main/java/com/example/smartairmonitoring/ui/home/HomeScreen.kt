@@ -1,12 +1,12 @@
 package com.example.smartairmonitoring.ui.home
 
 import android.app.Activity
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -20,11 +20,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -36,53 +37,54 @@ import com.example.smartairmonitoring.R
 import com.example.smartairmonitoring.modul.core.network.NetworkResponse
 import com.example.smartairmonitoring.ui.components.shimmerEffect
 import com.example.smartairmonitoring.ui.theme.*
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @Composable
 fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
     val homeState by viewModel.homeState.collectAsState()
     var showLocationDialog by remember { mutableStateOf(false) }
 
+    val aqiValue = ((homeState as? NetworkResponse.Success)?.data?.data?.aqi?.times(10)) ?: 0
 
-    val aqiValue = (homeState as? NetworkResponse.Success)?.data?.data?.aqi ?: 0
-
-
-    val (backgroundImage, systemBarColor, status) = when {
-        aqiValue <= 50 -> Triple(R.drawable.img_good_air, Color(0xFF2E7D32), "Good")
-        aqiValue <= 100 -> Triple(R.drawable.img_mid_air, Color(0xFFF57F17), "Not Healthy")
-        else -> Triple(R.drawable.img_air_pulluted, Color(0xFF37474F), "Unhealthy")
+    val (backgroundImage, _, status) = when {
+        aqiValue <= 50 -> Triple(R.drawable.img_good_air, Color(0xFF22C55E), "Good")
+        aqiValue <= 100 -> Triple(R.drawable.img_mid_air, Color(0xFFEAB308), "Moderate")
+        aqiValue <= 150 -> Triple(R.drawable.img_air_pulluted, Color(0xFFF97316), "Unhealthy")
+        else -> Triple(R.drawable.img_air_pulluted, Color(0xFFEF4444), "Unhealthy")
     }
-
-    val view = LocalView.current
-    if (!view.isInEditMode) {
-        SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = systemBarColor.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
-        }
-    }
-
-
 
     val towns = listOf("Dushanbe", "Khujand", "Bokhtar", "Kulob", "Istaravshan", "Panjakent", "Khorugh", "Tursunzoda", "Hisor")
     var location by remember { mutableStateOf( "Dushanbe")}
 
+    // Background slow zoom animation
+    val infiniteTransition = rememberInfiniteTransition(label = "Background")
+    val bgScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(20000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "BgScale"
+    )
+
     LaunchedEffect(Unit, location) {
         viewModel.getCityAirData(location)
     }
+
     Box(modifier = Modifier.fillMaxSize()) {
-        // Dynamic Background Image
         Image(
             painter = painterResource(id = backgroundImage),
             contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().scale(bgScale),
             contentScale = ContentScale.Crop
         )
         
-        // Dark Overlay to ensure readability
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(BackgroundDeepNavy.copy(alpha = 0.7f))
+                .background(BackgroundDeepNavy.copy(alpha = 0.75f))
         )
 
         Scaffold(
@@ -107,26 +109,52 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                             .fillMaxSize()
                             .padding(padding)
                             .verticalScroll(rememberScrollState())
-                            .padding(16.dp),
+                            .padding(horizontal = 20.dp, vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        LocationHeader()
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Air Quality",
+                                color = Color.White.copy(alpha = 0.8f),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = formatDt(data.dt),
+                                color = Color.White.copy(alpha = 0.5f),
+                                fontSize = 12.sp
+                            )
+                        }
                         
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
-
-
+                        // Large Status Text (Matching picture)
+                        Text(
+                            text = status,
+                            color = getAQIColor(aqiValue),
+                            fontSize = 42.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                         
-                        AQIGauge(aqi = aqiValue, status = status, subStatus = "")
+                        Text(
+                            text = "for Sensitive Groups",
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 16.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(28.dp))
                         
-                        Spacer(modifier = Modifier.height(32.dp))
+                        AQIGauge(aqi = aqiValue)
+                        
+                        Spacer(modifier = Modifier.height(40.dp))
+                        
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             InfoCard(label = "PM2.5", value = "${data.pm25}", unit = "µg/m³", modifier = Modifier.weight(1f), icon = Icons.Default.Air)
                             InfoCard(label = "PM10", value = "${data.pm10}", unit = "µg/m³", modifier = Modifier.weight(1f), icon = Icons.Default.Cloud)
-                            InfoCard(label = "o3", value = "${data.o3}", unit = "", modifier = Modifier.weight(1f), icon = Icons.Default.FilterDrama)
+                            InfoCard(label = "O3", value = "${data.o3}", unit = "ppb", modifier = Modifier.weight(1f), icon = Icons.Default.FilterDrama)
                         }
                         
                         Spacer(modifier = Modifier.height(24.dp))
@@ -137,7 +165,7 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                         
                         MainPollutantCard(name = "PM2.5", value = data.pm25.toInt(), maxValue = 100)
                         
-                        Spacer(modifier = Modifier.height(80.dp))
+                        Spacer(modifier = Modifier.height(100.dp))
                     }
                 }
                 is NetworkResponse.Error -> {
@@ -145,10 +173,7 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                         Text(text = state.message, color = Color.White)
                     }
                 }
-                is NetworkResponse.Idle ->{
-
-                }
-
+                else -> {}
             }
         }
     }
@@ -156,7 +181,7 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
     if (showLocationDialog) {
         AlertDialog(
             onDismissRequest = { showLocationDialog = false },
-            title = { Text("Select Town", color = TextPrimary) },
+            title = { Text("Select City", color = TextPrimary) },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     towns.forEach { town ->
@@ -184,6 +209,17 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
             },
             containerColor = BackgroundSecondary
         )
+    }
+}
+
+private fun formatDt(dt: String): String {
+    return try {
+        val inputSdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+        val outputSdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+        val date = inputSdf.parse(dt)
+        if (date != null) "Last update: ${outputSdf.format(date)}" else "Last update: $dt"
+    } catch (e: Exception) {
+        "Last update: $dt"
     }
 }
 
@@ -221,50 +257,68 @@ fun HomeTopBar(location: String, onLocationClick: () -> Unit) {
 }
 
 @Composable
-fun LocationHeader() {
-    Text(
-        text = "Air Quality",
-        color = TextSecondary,
-        fontSize = 14.sp
-    )
-}
-
-@Composable
-fun AQIGauge(
-    aqi: Int,
-    status: String,
-    subStatus: String
-) {
-
+fun AQIGauge(aqi: Int) {
     val maxAqi = 500f
-
-    // Convert AQI to angle
     val targetSweepAngle = (aqi / maxAqi) * 270f
 
-    // Animation
+    val infiniteTransition = rememberInfiniteTransition(label = "Glow")
+    
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(20000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "Rotation"
+    )
+
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "GlowAlpha"
+    )
+
     val animatedSweepAngle by animateFloatAsState(
         targetValue = targetSweepAngle,
         animationSpec = tween(
-            durationMillis = 1500,
+            durationMillis = 2000,
             easing = FastOutSlowInEasing
         ),
         label = "AQI Animation"
     )
 
+    val aqiColor = getAQIColor(aqi)
+
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier.size(230.dp)
+        modifier = Modifier.size(240.dp)
     ) {
+        Canvas(modifier = Modifier.size(220.dp)) {
+            val strokeWidth = 24.dp.toPx()
+            val dashStrokeWidth = 2.dp.toPx()
 
-        Canvas(
-            modifier = Modifier.size(220.dp)
-        ) {
+            // 1. Rotating background dash ring
+            rotate(rotation) {
+                drawArc(
+                    color = Color.White.copy(alpha = 0.05f),
+                    startAngle = 0f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    style = Stroke(
+                        width = dashStrokeWidth,
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 20f), 0f)
+                    )
+                )
+            }
 
-            val strokeWidth = 20.dp.toPx()
-
-            // Background arc
+            // 2. Background static arc
             drawArc(
-                color = Color.DarkGray.copy(alpha = 0.25f),
+                color = Color.Black.copy(alpha = 0.25f),
                 startAngle = 135f,
                 sweepAngle = 270f,
                 useCenter = false,
@@ -274,9 +328,27 @@ fun AQIGauge(
                 )
             )
 
-            // Animated progress arc
+            // 3. Dynamic Glow
             drawArc(
-                color = getAQIColor(aqi),
+                color = aqiColor.copy(alpha = glowAlpha * 0.2f),
+                startAngle = 135f,
+                sweepAngle = animatedSweepAngle,
+                useCenter = false,
+                style = Stroke(
+                    width = strokeWidth + 12.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            )
+
+            // 4. Progress Arc with Full scale gradient
+            drawArc(
+                brush = Brush.sweepGradient(
+                    0.0f to Color(0xFF22C55E),
+                    0.3f to Color(0xFFEAB308),
+                    0.6f to Color(0xFFEF4444),
+                    1.0f to Color(0xFFA855F7),
+                    center = center
+                ),
                 startAngle = 135f,
                 sweepAngle = animatedSweepAngle,
                 useCenter = false,
@@ -287,36 +359,19 @@ fun AQIGauge(
             )
         }
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-
-            Text(
-                text = status,
-                color = getAQIColor(aqi),
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Text(
-                text = subStatus,
-                color = Color.LightGray,
-                fontSize = 12.sp
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = aqi.toString(),
                 color = Color.White,
-                fontSize = 64.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = 82.sp,
+                fontWeight = FontWeight.ExtraBold
             )
 
             Text(
                 text = "AQI",
-                color = Color.LightGray,
-                fontSize = 16.sp
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold
             )
         }
     }
@@ -324,120 +379,160 @@ fun AQIGauge(
 
 fun getAQIColor(aqi: Int): Color {
     return when (aqi) {
-        in 0..50 -> Color(0xFF00E400)      // Good
-        in 51..100 -> Color(0xFFFFFF00)   // Moderate
-        in 101..150 -> Color(0xFFFF7E00)  // Unhealthy for sensitive
-        in 151..200 -> Color(0xFFFF0000)  // Unhealthy
-        in 201..300 -> Color(0xFF8F3F97)  // Very unhealthy
-        else -> Color(0xFF7E0023)         // Hazardous
+        in 0..50 -> Color(0xFF22C55E)
+        in 51..100 -> Color(0xFFEAB308)
+        in 101..150 -> Color(0xFFF97316)
+        in 151..200 -> Color(0xFFEF4444)
+        in 201..300 -> Color(0xFFA855F7)
+        else -> Color(0xFF7E22CE)
     }
 }
 
 @Composable
 fun InfoCard(label: String, value: String, unit: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(BackgroundSecondary.copy(alpha = 0.7f))
-            .padding(12.dp)
-    ) {
-        Text(text = label, color = TextSecondary, fontSize = 12.sp)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(text = value, color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        if (unit.isNotEmpty()) {
-            Text(text = unit, color = TextHint, fontSize = 10.sp)
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "Float")
+    val floatOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "FloatOffset"
+    )
+
+    Box(modifier = modifier.graphicsLayer(translationY = floatOffset)) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(animationSpec = tween(800)) + slideInVertically(initialOffsetY = { 40 })
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(BackgroundSecondary.copy(alpha = 0.7f))
+                    .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp))
+                    .padding(14.dp)
+            ) {
+                Text(text = label, color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = value, // Static text as requested
+                    color = TextPrimary,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                if (unit.isNotEmpty()) {
+                    Text(text = unit, color = TextHint, fontSize = 11.sp)
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Icon(imageVector = icon, contentDescription = null, tint = AIAccent, modifier = Modifier.size(18.dp))
+            }
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        Icon(imageVector = icon, contentDescription = null, tint = AIAccent, modifier = Modifier.size(16.dp))
     }
 }
 
 @Composable
 fun AIAdviceCard() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(BackgroundSecondary.copy(alpha = 0.7f))
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(1000, delayMillis = 200)) + slideInHorizontally(initialOffsetX = { 100 })
     ) {
-        Box(
+        Row(
             modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(BackgroundElevated),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(BackgroundSecondary.copy(alpha = 0.7f))
+                .border(1.dp, AIAccent.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
+                .padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(imageVector = Icons.Default.SmartToy, contentDescription = null, tint = AIAccent)
-        }
-        
-        Spacer(modifier = Modifier.width(16.dp))
-        
-        Column {
-            Text(text = "AI Advice", color = AIAccent, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text(
-                text = "Air quality is unhealthy today. Avoid outdoor activities, keep windows closed and stay hydrated.",
-                color = TextPrimary,
-                fontSize = 12.sp,
-                lineHeight = 16.sp
-            )
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(CircleShape)
+                    .background(BackgroundElevated),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(imageVector = Icons.Default.SmartToy, contentDescription = null, tint = AIAccent, modifier = Modifier.size(26.dp))
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text(text = "AI Advice", color = AIAccent, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                Text(
+                    text = "Air quality is unhealthy today. Avoid outdoor activities, keep windows closed and stay hydrated.",
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
+                )
+            }
         }
     }
 }
 
 @Composable
 fun MainPollutantCard(name: String, value: Int, maxValue: Int) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(BackgroundSecondary.copy(alpha = 0.7f))
-            .padding(16.dp)
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    val progress by animateFloatAsState(
+        targetValue = if (visible) value.toFloat() / maxValue.toFloat() else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
+        label = "PollutantProgress"
+    )
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(1000, delayMillis = 400)) + slideInVertically(initialOffsetY = { 60 })
     ) {
-        Text(text = "Main Pollutant", color = TextSecondary, fontSize = 14.sp)
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(text = name, color = Color(0xFFF43F5E), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Text(text = "$value µg/m³", color = TextPrimary, fontWeight = FontWeight.Bold)
-        }
-        
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(8.dp)
-                .clip(CircleShape)
-                .background(BackgroundElevated)
+                .clip(RoundedCornerShape(24.dp))
+                .background(BackgroundSecondary.copy(alpha = 0.7f))
+                .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(24.dp))
+                .padding(20.dp)
         ) {
+            Text(text = "Main Pollutant", color = TextSecondary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = name, color = Color(0xFFF43F5E), fontWeight = FontWeight.Black, fontSize = 22.sp)
+                Text(text = "$value µg/m³", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(value.toFloat() / maxValue.toFloat())
-                    .fillMaxHeight()
+                    .fillMaxWidth()
+                    .height(12.dp)
                     .clip(CircleShape)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                Color(0xFF22C55E),
-                                Color(0xFFEF4444)
-                            )
+                    .background(BackgroundElevated)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progress)
+                        .fillMaxHeight()
+                        .clip(CircleShape)
+                        .background(
+                            Brush.horizontalGradient(listOf(Color(0xFF22C55E), Color(0xFFFACC15), Color(0xFFEF4444)))
                         )
-                    )
+                )
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = "Dominant pollutant contributing to the poor air quality.",
+                color = TextHint,
+                fontSize = 12.sp
             )
         }
-        
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        Text(
-            text = "Dominant pollutant contributing to the poor air quality.",
-            color = TextHint,
-            fontSize = 11.sp
-        )
     }
 }

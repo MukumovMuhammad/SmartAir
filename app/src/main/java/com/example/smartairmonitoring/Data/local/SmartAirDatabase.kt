@@ -5,12 +5,13 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-
-
-
+import androidx.room.TypeConverters
 import com.example.smartairmonitoring.Data.local.entities.AirPollEntity
+import com.example.smartairmonitoring.Data.local.entities.ForecastEntity
+import com.example.smartairmonitoring.Data.local.entities.ForecastTypeConverters
 
-@Database(entities = [AirPollEntity::class], version = 2, exportSchema = false)
+@Database(entities = [AirPollEntity::class, ForecastEntity::class], version = 3, exportSchema = false)
+@TypeConverters(ForecastTypeConverters::class)
 abstract class SmartAirDatabase : RoomDatabase() {
 
     abstract fun airPollDao(): AirPollDao
