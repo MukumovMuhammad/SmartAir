@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "1042176330893",
-    "project_id": "smart-air-b112f",
-    "storage_bucket": "smart-air-b112f.firebasestorage.app"
+    "project_number": "448681448130",
+    "project_id": "gemma4-8e8c0",
+    "storage_bucket": "gemma4-8e8c0.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1042176330893:android:7dba15673a39374418e6c4",
+        "mobilesdk_app_id": "1:448681448130:android:3301bbeb279150518c615b",
         "android_client_info": {
           "package_name": "com.example.smartairmonitoring"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCWeMcArxanykZ-4alVtkJJzWk4jYAIIu8"
+          "current_key": "AIzaSyCbVM0Wus9P1ok-4Bjlfsk8JujL4FA9BXk"
         }
       ],
       "services": {

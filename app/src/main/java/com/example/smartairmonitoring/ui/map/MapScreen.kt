@@ -157,7 +157,7 @@ fun MapScreen(viewModel: MapViewModel, onBackClick: () -> Unit) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .weight(0.5f) // Map takes 50%
             ) {
                 MapboxMap(
                     modifier = Modifier.fillMaxSize(),
@@ -186,30 +186,48 @@ fun MapScreen(viewModel: MapViewModel, onBackClick: () -> Unit) {
                                             interpolate {
                                                 linear()
                                                 get("value")
-                                                stop { literal(0.0); literal(0.0) }
-                                                stop { literal(300.0); literal(1.0) }
+                                                stop { literal(0.0); literal(0.1) }
+                                                stop {
+                                                    literal(
+                                                        when (selectedFilter) {
+                                                            "AQI" -> 300.0
+                                                            "PM2.5", "PM10" -> 150.0
+                                                            else -> 100.0
+                                                        }
+                                                    )
+                                                    literal(1.0)
+                                                }
                                             }
                                         )
                                         heatmapRadius(
                                             interpolate {
                                                 linear()
                                                 zoom()
-                                                stop { literal(5.0); literal(20.0) }
-                                                stop { literal(12.0); literal(80.0) }
+                                                stop { literal(4.0); literal(15.0) }
+                                                stop { literal(8.0); literal(40.0) }
+                                                stop { literal(12.0); literal(100.0) }
                                             }
                                         )
-                                        heatmapIntensity(1.0)
-                                        heatmapOpacity(0.8)
+                                        heatmapIntensity(
+                                            interpolate {
+                                                linear()
+                                                zoom()
+                                                stop { literal(4.0); literal(0.5) }
+                                                stop { literal(12.0); literal(2.0) }
+                                            }
+                                        )
+                                        heatmapOpacity(0.7)
                                         heatmapColor(
                                             interpolate {
                                                 linear()
                                                 heatmapDensity()
                                                 stop { literal(0.0); rgba(0.0, 0.0, 0.0, 0.0) }
-                                                stop { literal(0.16); rgb(34.0, 197.0, 94.0) }   // Good
-                                                stop { literal(0.33); rgb(234.0, 179.0, 8.0) }   // Moderate
-                                                stop { literal(0.5); rgb(249.0, 115.0, 22.0) }   // Sensitive
-                                                stop { literal(0.66); rgb(239.0, 68.0, 68.0) }   // Unhealthy
-                                                stop { literal(1.0); rgb(168.0, 85.0, 247.0) }   // Hazardous
+                                                stop { literal(0.1); rgb(34.0, 197.0, 94.0) }   // Good (Green)
+                                                stop { literal(0.3); rgb(234.0, 179.0, 8.0) }   // Moderate (Yellow)
+                                                stop { literal(0.5); rgb(249.0, 115.0, 22.0) }  // Sensitive (Orange)
+                                                stop { literal(0.7); rgb(239.0, 68.0, 68.0) }   // Unhealthy (Red)
+                                                stop { literal(0.9); rgb(168.0, 85.0, 247.0) }  // Very Unhealthy (Purple)
+                                                stop { literal(1.0); rgb(126.0, 34.0, 206.0) }  // Hazardous (Deep Purple)
                                             }
                                         )
                                     }
@@ -244,6 +262,7 @@ fun MapScreen(viewModel: MapViewModel, onBackClick: () -> Unit) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .weight(0.5f) // Details take 50%
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -273,7 +292,15 @@ fun MapScreen(viewModel: MapViewModel, onBackClick: () -> Unit) {
                                 LocationDetailCard(
                                     city = city,
                                     isSelected = selectedCity?.city == city.city,
-                                    onClick = { viewModel.selectCity(city) }
+                                    onClick = { 
+                                        viewModel.selectCity(city)
+                                        mapViewportState.flyTo(
+                                            CameraOptions.Builder()
+                                                .center(Point.fromLngLat(city.lon, city.lat))
+                                                .zoom(10.0)
+                                                .build()
+                                        )
+                                    }
                                 )
                             }
                         }

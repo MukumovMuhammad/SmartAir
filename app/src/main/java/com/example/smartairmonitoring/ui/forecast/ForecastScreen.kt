@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -40,6 +41,7 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBackClick: () -> Unit) {
     var selectedTab by remember { mutableStateOf("Today") }
     val tabs = listOf("Today", "Tomorrow", "7 Days")
     val forecastState by viewModel.forecastState.collectAsState()
+    var infoDialogContent by remember { mutableStateOf<Pair<String, String>?>(null) }
     
     val city = "Dushanbe"
 
@@ -70,8 +72,17 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBackClick: () -> Unit) {
                     }
                 },
                 actions = {
-                    IconButton(onClick = { }) {
-                        Icon(Icons.Default.Info, contentDescription = null, tint = TextPrimary)
+                    IconButton(onClick = { 
+                        infoDialogContent = "PM2.5 Levels Guide" to """
+                            • Good (0-12 µg/m³): Air quality is satisfactory.
+                            • Moderate (12.1-35.4 µg/m³): Sensitive people should limit prolonged outdoor exertion.
+                            • Unhealthy for Sensitive Groups (35.5-55.4 µg/m³): People with lung disease, older adults and children should reduce outdoor exertion.
+                            • Unhealthy (55.5-150.4 µg/m³): Everyone may begin to experience health effects.
+                            • Very Unhealthy (150.5-250.4 µg/m³): Health alert: everyone may experience more serious health effects.
+                            • Hazardous (250.5+ µg/m³): Health warnings of emergency conditions.
+                        """.trimIndent()
+                    }) {
+                        Icon(Icons.Default.Info, contentDescription = "PM2.5 Guide", tint = TextPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -81,6 +92,19 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBackClick: () -> Unit) {
         },
         containerColor = BackgroundDeepNavy
     ) { padding ->
+        if (infoDialogContent != null) {
+            AlertDialog(
+                onDismissRequest = { infoDialogContent = null },
+                title = { Text(infoDialogContent?.first ?: "", color = TextPrimary) },
+                text = { Text(infoDialogContent?.second ?: "", color = TextSecondary) },
+                confirmButton = {
+                    TextButton(onClick = { infoDialogContent = null }) {
+                        Text("Close", color = AIAccent)
+                    }
+                },
+                containerColor = BackgroundSecondary
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -137,6 +161,9 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBackClick: () -> Unit) {
                             data.forecastPoints
                         }
 
+                        val maxPm25 = displayPoints.maxOfOrNull { it.pm25 } ?: data.maxPm25
+                        val (statusText, statusColor) = getStatusFromPm25(maxPm25)
+
                         // HERO SECTION
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -150,28 +177,28 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBackClick: () -> Unit) {
                                     fontSize = 16.sp
                                 )
                                 Text(
-                                    data.maxAqiLabel,
-                                    color = getAQIColorFromLabel(data.maxAqiLabel),
+                                    statusText,
+                                    color = statusColor,
                                     fontSize = 32.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    "AQI may reach ${data.maxAqi}",
+                                    "PM2.5 may reach ${maxPm25.toInt()}",
                                     color = TextHint,
                                     fontSize = 14.sp
                                 )
                             }
                             
                             Icon(
-                                imageVector = Icons.Default.Warning,
+                                imageVector = if (statusText == "Good") Icons.Default.CheckCircle else Icons.Default.Warning,
                                 contentDescription = null,
-                                tint = getAQIColorFromLabel(data.maxAqiLabel),
+                                tint = statusColor,
                                 modifier = Modifier.size(64.dp)
                             )
                         }
 
                         // CHART SECTION
-                        ForecastChartCard(displayPoints, data.maxAqiLabel, isToday = selectedTab == "Today")
+                        ForecastChartCard(displayPoints, statusText, isToday = selectedTab == "Today")
 
                         // DAILY OVERVIEW
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -225,6 +252,17 @@ fun getAQIColorFromLabel(label: String): Color {
         "very unhealthy" -> Color(0xFFA855F7)
         "hazardous" -> Color(0xFF7E22CE)
         else -> Color.Gray
+    }
+}
+
+fun getStatusFromPm25(pm25: Double): Pair<String, Color> {
+    return when {
+        pm25 <= 12.0 -> "Good" to Color(0xFF22C55E)
+        pm25 <= 35.4 -> "Moderate" to Color(0xFFEAB308)
+        pm25 <= 55.4 -> "Unhealthy for Sensitive Groups" to Color(0xFFF97316)
+        pm25 <= 150.4 -> "Unhealthy" to Color(0xFFEF4444)
+        pm25 <= 250.4 -> "Very Unhealthy" to Color(0xFFA855F7)
+        else -> "Hazardous" to Color(0xFF7E22CE)
     }
 }
 
@@ -461,6 +499,7 @@ fun DailyOverviewCard(points: List<ForecastPointDto>) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         val label = formatOverviewLabel(item)
+                        val (PMstatus, color)  = getStatusFromPm25(item.pm25)
                         Text(
                             text = label,
                             color = TextPrimary,
@@ -473,7 +512,7 @@ fun DailyOverviewCard(points: List<ForecastPointDto>) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            val color = getAQIColorFromLabel(item.aqiLabel)
+
                             Box(
                                 modifier = Modifier
                                     .size(8.dp)
@@ -482,7 +521,7 @@ fun DailyOverviewCard(points: List<ForecastPointDto>) {
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = item.aqiLabel,
+                                text = PMstatus,
                                 color = TextSecondary,
                                 fontSize = 13.sp,
                                 maxLines = 1
@@ -490,7 +529,7 @@ fun DailyOverviewCard(points: List<ForecastPointDto>) {
                         }
                         
                         Text(
-                            text = item.aqi.toString(),
+                            text = item.pm25.toString() + "µg/m³",
                             color = TextPrimary,
                             modifier = Modifier.weight(1f),
                             textAlign = androidx.compose.ui.text.style.TextAlign.End,

@@ -6,8 +6,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.smartairmonitoring.Data.repository.AirPollRepository
 import com.example.smartairmonitoring.Data.remote.dto.MapCityDto
+import com.example.smartairmonitoring.Data.remote.dto.MapDataDto
 import com.example.smartairmonitoring.Data.remote.dto.MapResponse
 import com.example.smartairmonitoring.modul.core.network.NetworkResponse
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -24,33 +26,53 @@ class MapViewModel(
     private val _selectedCity = MutableStateFlow<MapCityDto?>(null)
     val selectedCity = _selectedCity.asStateFlow()
 
+    private var mapJob: Job? = null
+
     fun getMapData(pollutant: String) {
         Log.i(TAG, "Fetching map data for pollutant: $pollutant")
-        viewModelScope.launch {
-            _mapState.value = NetworkResponse.Loading
-            val result = repo.getMapData(pollutant)
-            _mapState.value = result
-            
-            // If we have a selected city, update it from the new data
-            if (result is NetworkResponse.Success) {
-                val cities = result.data.data.cities
-                Log.d(TAG, "Successfully fetched data for ${cities.size} cities")
-                
-                val currentSelected = _selectedCity.value
-                if (currentSelected != null) {
-                    val updated = cities.find { it.city == currentSelected.city }
-                    if (updated != null) {
-                        Log.d(TAG, "Updating selected city data: ${updated.city}")
-                        _selectedCity.value = updated
+        
+        mapJob?.cancel()
+        _mapState.value = NetworkResponse.Loading
+
+        mapJob = viewModelScope.launch {
+            // Observe local database
+            launch {
+                repo.getLocalMapData(pollutant).collect { cached ->
+                    if (cached != null) {
+                        Log.d(TAG, "Displaying cached map data for $pollutant")
+                        val response = MapResponse(
+                            status = "success",
+                            data = MapDataDto(
+                                pollutant = cached.pollutant,
+                                cities = cached.cities
+                            )
+                        )
+                        _mapState.value = NetworkResponse.Success(response)
+                        updateSelectedCityFromData(cached.cities)
                     }
-                } else if (_selectedCity.value == null && cities.isNotEmpty()) {
-                    // Default to first city if none selected
-                    Log.d(TAG, "Setting default selected city: ${cities.first().city}")
-                    _selectedCity.value = cities.first()
                 }
-            } else if (result is NetworkResponse.Error) {
-                Log.e(TAG, "Error fetching map data: ${result.message}")
             }
+
+            // Fetch from network
+            val result = repo.getMapData(pollutant)
+            if (result is NetworkResponse.Success) {
+                updateSelectedCityFromData(result.data.data.cities)
+            } else if (result is NetworkResponse.Error && _mapState.value !is NetworkResponse.Success) {
+                Log.e(TAG, "Error fetching map data: ${result.message}")
+                _mapState.value = result
+            }
+        }
+    }
+
+    private fun updateSelectedCityFromData(cities: List<MapCityDto>) {
+        val currentSelected = _selectedCity.value
+        if (currentSelected != null) {
+            val updated = cities.find { it.city == currentSelected.city }
+            if (updated != null) {
+                _selectedCity.value = updated
+            }
+        } else if (cities.isNotEmpty()) {
+            _selectedCity.value = cities.first()
         }
     }
 

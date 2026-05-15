@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
 import com.example.smartairmonitoring.Data.remote.dto.ForecastPointDto
+import com.example.smartairmonitoring.Data.remote.dto.MapCityDto
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
@@ -30,6 +31,17 @@ class ForecastTypeConverters {
     @TypeConverter
     fun toForecastPointList(value: String): List<ForecastPointDto> {
         val listType = object : TypeToken<List<ForecastPointDto>>() {}.type
+        return gson.fromJson(value, listType)
+    }
+
+    @TypeConverter
+    fun fromMapCityList(value: List<MapCityDto>?): String {
+        return gson.toJson(value)
+    }
+
+    @TypeConverter
+    fun toMapCityList(value: String): List<MapCityDto> {
+        val listType = object : TypeToken<List<MapCityDto>>() {}.type
         return gson.fromJson(value, listType)
     }
 }

@@ -9,8 +9,9 @@ import androidx.room.TypeConverters
 import com.example.smartairmonitoring.Data.local.entities.AirPollEntity
 import com.example.smartairmonitoring.Data.local.entities.ForecastEntity
 import com.example.smartairmonitoring.Data.local.entities.ForecastTypeConverters
+import com.example.smartairmonitoring.Data.local.entities.MapEntity
 
-@Database(entities = [AirPollEntity::class, ForecastEntity::class], version = 3, exportSchema = false)
+@Database(entities = [AirPollEntity::class, ForecastEntity::class, MapEntity::class], version = 4, exportSchema = false)
 @TypeConverters(ForecastTypeConverters::class)
 abstract class SmartAirDatabase : RoomDatabase() {
 

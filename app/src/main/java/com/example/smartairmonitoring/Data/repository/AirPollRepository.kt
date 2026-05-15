@@ -5,6 +5,7 @@ import com.example.smartairmonitoring.Data.local.AirPollDao
 import com.example.smartairmonitoring.Data.local.entities.AirPollData
 import com.example.smartairmonitoring.Data.local.entities.AirPollEntity
 import com.example.smartairmonitoring.Data.local.entities.ForecastEntity
+import com.example.smartairmonitoring.Data.local.entities.MapEntity
 import com.example.smartairmonitoring.Data.remote.AirPollApiService
 import com.example.smartairmonitoring.Data.remote.dto.AIAdviceResponse
 import com.example.smartairmonitoring.Data.remote.dto.AirPollutionResponse
@@ -63,12 +64,21 @@ class AirPollRepository @Inject constructor(
         Log.d("AirPollRepository", "API Call: getMapData(pollutant=$pollutant)")
         return try {
             val response = api.getMapData(pollutant)
+            // Save to Room
+            val entity = MapEntity(
+                pollutant = pollutant,
+                cities = response.data.cities
+            )
+            dao.insertMapData(entity)
             NetworkResponse.Success(response)
         } catch (e: Exception) {
             Log.e("AirPollRepository", "API Error in getMapData", e)
             NetworkResponse.Error(e.message ?: "Failed to fetch map data")
         }
     }
+
+    fun getLocalMapData(pollutant: String): Flow<MapEntity?> = 
+        dao.getMapData(pollutant)
 
     suspend fun getAIAdvice(city: String, healthCondition: String, activityLevel: String): NetworkResponse<AIAdviceResponse> {
         return try {

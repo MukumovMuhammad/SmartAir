@@ -44,6 +44,7 @@ import java.util.Locale
 fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
     val homeState by viewModel.homeState.collectAsState()
     var showLocationDialog by remember { mutableStateOf(false) }
+    var infoDialogContent by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     val aqiValue = ((homeState as? NetworkResponse.Success)?.data?.data?.aqi?.times(10)) ?: 0
 
@@ -57,18 +58,6 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
     val towns = listOf("Dushanbe", "Khujand", "Bokhtar", "Kulob", "Istaravshan", "Panjakent", "Khorugh", "Tursunzoda", "Hisor")
     var location by remember { mutableStateOf( "Dushanbe")}
 
-    // Background slow zoom animation
-    val infiniteTransition = rememberInfiniteTransition(label = "Background")
-    val bgScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.05f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(20000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "BgScale"
-    )
-
     LaunchedEffect(Unit, location) {
         viewModel.getCityAirData(location)
     }
@@ -77,7 +66,7 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
         Image(
             painter = painterResource(id = backgroundImage),
             contentDescription = null,
-            modifier = Modifier.fillMaxSize().scale(bgScale),
+            modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
         )
         
@@ -152,9 +141,36 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            InfoCard(label = "PM2.5", value = "${data.pm25}", unit = "µg/m³", modifier = Modifier.weight(1f), icon = Icons.Default.Air)
-                            InfoCard(label = "PM10", value = "${data.pm10}", unit = "µg/m³", modifier = Modifier.weight(1f), icon = Icons.Default.Cloud)
-                            InfoCard(label = "O3", value = "${data.o3}", unit = "ppb", modifier = Modifier.weight(1f), icon = Icons.Default.FilterDrama)
+                            InfoCard(
+                                label = "PM2.5",
+                                value = "${data.pm25}",
+                                unit = "µg/m³",
+                                modifier = Modifier.weight(1f),
+                                icon = Icons.Default.Air,
+                                onInfoClick = {
+                                    infoDialogContent = "PM2.5" to "Fine particulate matter (PM2.5) are tiny particles in the air that reduce visibility and cause the air to appear hazy when levels are elevated. They are small enough to get deep into the lungs and even into the bloodstream."
+                                }
+                            )
+                            InfoCard(
+                                label = "PM10",
+                                value = "${data.pm10}",
+                                unit = "µg/m³",
+                                modifier = Modifier.weight(1f),
+                                icon = Icons.Default.Cloud,
+                                onInfoClick = {
+                                    infoDialogContent = "PM10" to "Particulate matter 10 micrometers or less in diameter. These particles are inhalable into the lungs and can induce adverse health effects. Sources include crushing/grinding operations and dust stirred up by vehicles."
+                                }
+                            )
+                            InfoCard(
+                                label = "O3",
+                                value = "${data.o3}",
+                                unit = "ppb",
+                                modifier = Modifier.weight(1f),
+                                icon = Icons.Default.FilterDrama,
+                                onInfoClick = {
+                                    infoDialogContent = "O3 (Ozone)" to "Ground-level ozone is not emitted directly into the air, but is created by chemical reactions between oxides of nitrogen (NOx) and volatile organic compounds (VOC) in the presence of sunlight."
+                                }
+                            )
                         }
                         
                         Spacer(modifier = Modifier.height(24.dp))
@@ -163,7 +179,14 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                         
                         Spacer(modifier = Modifier.height(24.dp))
                         
-                        MainPollutantCard(name = "PM2.5", value = data.pm25.toInt(), maxValue = 100)
+                        MainPollutantCard(
+                            name = "PM2.5",
+                            value = data.pm25.toInt(),
+                            maxValue = 100,
+                            onInfoClick = {
+                                infoDialogContent = "Main Pollutant" to "This is the pollutant currently contributing most to the Air Quality Index (AQI) calculation. Protecting yourself from this specific pollutant is the highest priority."
+                            }
+                        )
                         
                         Spacer(modifier = Modifier.height(100.dp))
                     }
@@ -176,6 +199,20 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                 else -> {}
             }
         }
+    }
+
+    if (infoDialogContent != null) {
+        AlertDialog(
+            onDismissRequest = { infoDialogContent = null },
+            title = { Text(infoDialogContent?.first ?: "", color = TextPrimary) },
+            text = { Text(infoDialogContent?.second ?: "", color = TextSecondary) },
+            confirmButton = {
+                TextButton(onClick = { infoDialogContent = null }) {
+                    Text("Close", color = AIAccent)
+                }
+            },
+            containerColor = BackgroundSecondary
+        )
     }
 
     if (showLocationDialog) {
@@ -389,7 +426,14 @@ fun getAQIColor(aqi: Int): Color {
 }
 
 @Composable
-fun InfoCard(label: String, value: String, unit: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
+fun InfoCard(
+    label: String,
+    value: String,
+    unit: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+    onInfoClick: () -> Unit
+) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
 
@@ -417,7 +461,21 @@ fun InfoCard(label: String, value: String, unit: String, icon: androidx.compose.
                     .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp))
                     .padding(14.dp)
             ) {
-                Text(text = label, color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = label, color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Info",
+                        tint = TextHint,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .clickable { onInfoClick() }
+                    )
+                }
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
                     text = value, // Static text as requested
@@ -477,7 +535,7 @@ fun AIAdviceCard() {
 }
 
 @Composable
-fun MainPollutantCard(name: String, value: Int, maxValue: Int) {
+fun MainPollutantCard(name: String, value: Int, maxValue: Int, onInfoClick: () -> Unit) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
 
@@ -499,7 +557,21 @@ fun MainPollutantCard(name: String, value: Int, maxValue: Int) {
                 .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(24.dp))
                 .padding(20.dp)
         ) {
-            Text(text = "Main Pollutant", color = TextSecondary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "Main Pollutant", color = TextSecondary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "Info",
+                    tint = TextHint,
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clickable { onInfoClick() }
+                )
+            }
             Spacer(modifier = Modifier.height(16.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
