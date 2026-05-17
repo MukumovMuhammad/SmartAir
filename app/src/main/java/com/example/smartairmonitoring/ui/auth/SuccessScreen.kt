@@ -81,9 +81,10 @@ fun SuccessScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.robot_greeting),
+                    painter = painterResource(id = R.drawable.img_ai_robot),
                     contentDescription = null,
-                    modifier = Modifier.size(120.dp)
+                    modifier = Modifier.size(120.dp),
+                    contentScale = ContentScale.Fit
                 )
                 
                 Box(

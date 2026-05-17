@@ -49,7 +49,7 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
     var showLocationDialog by remember { mutableStateOf(false) }
     var infoDialogContent by remember { mutableStateOf<Pair<String, String>?>(null) }
 
-    val aqiValue = ((homeState as? NetworkResponse.Success)?.data?.data?.aqi?.times(10)) ?: 0
+    val aqiValue = ((homeState as? NetworkResponse.Success)?.data?.data?.aqi) ?: 0
 
     val (backgroundImage, _, status) = when {
         aqiValue <= 50 -> Triple(R.drawable.img_good_air, Color(0xFF22C55E), "Good")
@@ -191,7 +191,7 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                             )
                             InfoCard(
                                 label = "O3",
-                                value = "${data.o3}",
+                                value = "${data.o3.toInt()}",
                                 unit = "ppb",
                                 modifier = Modifier.weight(1f),
                                 icon = Icons.Default.FilterDrama,
@@ -546,7 +546,12 @@ fun AIAdviceCard(advice: String) {
                     .background(BackgroundElevated),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(imageVector = Icons.Default.SmartToy, contentDescription = null, tint = AIAccent, modifier = Modifier.size(26.dp))
+                Image(
+                    painter = painterResource(id = R.drawable.img_ai_robot),
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    contentScale = ContentScale.Fit
+                )
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column {

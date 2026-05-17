@@ -1,15 +1,20 @@
 package com.example.smartairmonitoring.ui.ai
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.*
@@ -19,10 +24,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.smartairmonitoring.R
 import com.example.smartairmonitoring.Data.remote.dto.ChatMessageDto
 import com.example.smartairmonitoring.modul.core.network.NetworkResponse
 import com.example.smartairmonitoring.modul.core.network.RetrofitInstance
@@ -74,7 +83,7 @@ fun AIAssistantScreen(onBackClick: () -> Unit) {
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = null, tint = TextPrimary)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = TextPrimary)
                     }
                 },
                 actions = {
@@ -115,11 +124,23 @@ fun AIAssistantScreen(onBackClick: () -> Unit) {
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                             contentPadding = PaddingValues(vertical = 16.dp)
                         ) {
-                            items(messages) { msg ->
-                                if (msg.role == "user") {
-                                    UserMessageBubble(msg.content, formatTime(msg.createdAt))
-                                } else {
-                                    AIMessageBubble(msg.content, formatTime(msg.createdAt))
+                            items(messages, key = { it.id }) { msg ->
+                                // Entrance animation for messages
+                                var visible by remember { mutableStateOf(value = false) }
+                                LaunchedEffect(key1 = msg.id) {
+                                    visible = true
+                                }
+                                
+                                AnimatedVisibility(
+                                    visible = visible,
+                                    enter = fadeIn(animationSpec = tween(durationMillis = 500)) + 
+                                            slideInVertically { 20 }
+                                ) {
+                                    if (msg.role == "user") {
+                                        UserMessageBubble(msg.content, formatTime(msg.createdAt))
+                                    } else {
+                                        AIMessageBubble(msg.content, formatTime(msg.createdAt))
+                                    }
                                 }
                             }
                             
@@ -132,8 +153,35 @@ fun AIAssistantScreen(onBackClick: () -> Unit) {
                     }
                 }
                 is NetworkResponse.Error -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(state.message, color = Color.Red)
+                    Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                        Surface(
+                            color = Color(0xFFFFEBEE),
+                            shape = RoundedCornerShape(16.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF5350))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = Color(0xFFD32F2F))
+                                Column {
+                                    Text(
+                                        "Something went wrong",
+                                        color = Color(0xFFD32F2F),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        state.message,
+                                        color = Color(0xFFC62828),
+                                        fontSize = 12.sp,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
                 else -> {
@@ -185,16 +233,16 @@ fun AiriHeader() {
     ) {
         Box(
             modifier = Modifier
-                .size(100.dp)
+                .size(120.dp)
                 .clip(CircleShape)
                 .background(BackgroundSecondary),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                Icons.Default.SmartToy,
-                contentDescription = null,
-                tint = AIAccent,
-                modifier = Modifier.size(60.dp)
+            Image(
+                painter = painterResource(id = R.drawable.img_ai_robot),
+                contentDescription = "AI Robot",
+                modifier = Modifier.size(100.dp),
+                contentScale = ContentScale.Fit
             )
         }
         
@@ -269,10 +317,27 @@ fun UserMessageBubble(message: String, time: String) {
 
 @Composable
 fun AIMessageBubble(message: String, time: String) {
-    Column(
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.Start
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.Bottom
     ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(BackgroundSecondary),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.img_ai_robot),
+                contentDescription = null,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        
+        Spacer(modifier = Modifier.width(8.dp))
+
         Surface(
             color = ChatBackground,
             shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp)
@@ -346,7 +411,7 @@ fun ChatInputArea(onSend: (String) -> Unit, enabled: Boolean) {
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.Send,
+                    imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Send",
                     tint = Color.White,
                     modifier = Modifier.size(20.dp)

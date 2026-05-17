@@ -45,6 +45,7 @@ fun CompleteProfileScreen(
     var otherCondition by remember { mutableStateOf("") }
 
     val ageGroups = listOf("Under 18", "18 - 24", "25 - 34", "35 - 44", "45 - 54", "55 - 64", "65+")
+    val chunkedAgeGroups = ageGroups.chunked(3)
     val healthConditions = listOf("Asthma", "Allergies", "Bronchitis", "COPD", "Heart Condition", "None", "Others")
 
     val authState by viewModel.authState.collectAsState()
@@ -137,17 +138,26 @@ fun CompleteProfileScreen(
                 Column {
                     SectionHeader(title = "Your Age Group")
                     Spacer(modifier = Modifier.height(12.dp))
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+
+                    val chunkedAgeGroups = ageGroups.chunked(3)
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        ageGroups.forEach { age ->
-                            SelectableChip(
-                                text = age,
-                                isSelected = (selectedAgeGroup == age),
-                                onClick = { selectedAgeGroup = age }
-                            )
+                        chunkedAgeGroups.forEach { rowItems ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                rowItems.forEach { age ->
+                                    SelectableChip(
+                                        text = age,
+                                        isSelected = (selectedAgeGroup == age),
+                                        onClick = { selectedAgeGroup = age }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -156,29 +166,42 @@ fun CompleteProfileScreen(
             // Health Conditions Section
             item {
                 Column {
-                    SectionHeader(title = "Health Conditions", subtitle = "Select all that apply")
-                    Spacer(modifier = Modifier.height(12.dp))
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        healthConditions.forEach { condition ->
-                            val isSelected = selectedConditions.contains(condition)
+                    SectionHeader(
+                        title = "Health Conditions",
+                        subtitle = "Select all that apply"
+                    )
 
-                            SelectableChip(
-                                text = condition,
-                                isSelected = isSelected,
-                                showCheckbox = true,
-                                onClick = {
-                                    selectedConditions = if (condition == "None") {
-                                        if (isSelected) emptySet() else setOf("None")
-                                    } else {
-                                        val current = selectedConditions - "None"
-                                        if (isSelected) current - condition else current + condition
-                                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    val chunkedConditions = healthConditions.chunked(2)
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        chunkedConditions.forEach { rowItems ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                rowItems.forEach { condition ->
+                                    val isSelected = selectedConditions.contains(condition)
+
+                                    SelectableChip(
+                                        text = condition,
+                                        isSelected = isSelected,
+                                        showCheckbox = true,
+                                        onClick = {
+                                            selectedConditions = if (condition == "None") {
+                                                if (isSelected) emptySet() else setOf("None")
+                                            } else {
+                                                val current = selectedConditions - "None"
+                                                if (isSelected) current - condition else current + condition
+                                            }
+                                        }
+                                    )
                                 }
-                            )
+                            }
                         }
                     }
                 }

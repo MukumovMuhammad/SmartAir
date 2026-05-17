@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitInstance {
 
-    private const val BASE_URL = "http://192.168.123.38:8000/" // Replace with your actual server URL
+    private const val BASE_URL = "https://gemma4-django-105829172718.europe-west3.run.app/" // Replace with your actual server URL
 
     private val cookieStore = mutableMapOf<String, List<Cookie>>()
 
