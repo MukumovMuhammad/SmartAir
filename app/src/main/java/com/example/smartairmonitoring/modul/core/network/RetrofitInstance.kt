@@ -8,7 +8,7 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitInstance {
 
-    private const val BASE_URL = "http://192.168.0.118:8000" // Replace with your actual server URL
+    private const val BASE_URL = "http://192.168.123.38:8000" // Replace with your actual server URL
 
     private val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()

@@ -117,10 +117,17 @@ fun AiriHeader() {
             fontWeight = FontWeight.Bold
         )
         
+        Text(
+            "Powered by Gemma 4",
+            color = AIAccent,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium
+        )
+        
         Spacer(modifier = Modifier.height(8.dp))
         
         Text(
-            "Your AI air quality assistant.\nHow can I help you today?",
+            "Your AI air quality assistant, powered by the latest AI technology.\nHow can I help you today?",
             color = TextSecondary,
             fontSize = 14.sp,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,

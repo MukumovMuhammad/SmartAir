@@ -142,8 +142,7 @@ fun SuccessScreen(
                 iconColor = DataBlue
             )
 
-            Spacer(modifier = Modifier.weight(1f))
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(48.dp))
 
             PrimaryGradientButton(
                 text = "Let's Get Started",

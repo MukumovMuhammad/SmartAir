@@ -2,6 +2,7 @@ package com.example.smartairmonitoring.Data.remote.dto
 
 import com.example.smartairmonitoring.Data.local.entities.AirPollData
 import com.example.smartairmonitoring.Data.local.entities.AirPollEntity
+import com.google.gson.JsonElement
 import com.google.gson.annotations.SerializedName
 
 data class AirPollutionResponse(
@@ -102,7 +103,7 @@ data class AIAdviceDataDto(
     @SerializedName("aqi_label") val aqiLabel: String,
     @SerializedName("health_condition") val healthCondition: String,
     @SerializedName("activity_level") val activityLevel: String,
-    @SerializedName("advice") val advice: String
+    @SerializedName("advice") val advice: JsonElement
 )
 
 data class MapResponse(

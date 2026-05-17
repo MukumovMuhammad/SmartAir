@@ -31,7 +31,7 @@ class HomeViewModel(
     private var aiAdviceJob: Job? = null
 
     fun getCityAirData(city: String) {
-        Log.i(TAG, "Getting data for $city")
+        Log.i(TAG, "Initiating air data fetch for city: $city")
 
         homeJob?.cancel()
         _homeState.value = NetworkResponse.Loading
@@ -41,25 +41,45 @@ class HomeViewModel(
             launch {
                 repo.getLocalPollution(city).collect { cached ->
                     if (cached != null) {
-                        Log.d(TAG, "Displaying cached data for $city")
+                        Log.d(TAG, "Successfully retrieved cached air data for $city")
                         _homeState.value = NetworkResponse.Success(cached)
+                    } else {
+                        Log.d(TAG, "No cached air data found for $city")
                     }
                 }
             }
 
-            // Fetch from network
-            val result = repo.fetchAndSaveCurrentAirPoll(city)
-            Log.d(TAG, "Network fetch result: $result")
-            
-            // If network fails and we have no cache, show error
-            if (result is NetworkResponse.Error && _homeState.value !is NetworkResponse.Success) {
-                _homeState.value = result
+            try {
+                // Fetch from network
+                Log.d(TAG, "Fetching fresh air data from network for $city...")
+                val result = repo.fetchAndSaveCurrentAirPoll(city)
+                
+                when (result) {
+                    is NetworkResponse.Success -> {
+                        Log.i(TAG, "Successfully fetched and saved air data for $city")
+                    }
+                    is NetworkResponse.Error -> {
+                        Log.e(TAG, "Failed to fetch air data for $city: ${result.message}")
+                        // If we have no cache, show error to UI
+                        if (_homeState.value !is NetworkResponse.Success) {
+                            _homeState.value = result
+                        }
+                    }
+                    else -> {
+                        Log.d(TAG, "Network fetch for $city returned state: $result")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Critical error during air data operation for $city", e)
+                if (_homeState.value !is NetworkResponse.Success) {
+                    _homeState.value = NetworkResponse.Error(e.message ?: "An unexpected error occurred")
+                }
             }
         }
     }
 
     fun getAIAdvice(city: String, healthCondition: String = "None", activityLevel: String = "Active") {
-        Log.i(TAG, "Getting AI advice for $city")
+        Log.i(TAG, "Initiating AI advice fetch for city: $city (Condition: $healthCondition)")
 
         aiAdviceJob?.cancel()
         _aiAdviceState.value = NetworkResponse.Loading
@@ -69,18 +89,38 @@ class HomeViewModel(
             launch {
                 repo.getLocalAIAdvice(city).collect { cached ->
                     if (cached != null) {
-                        Log.d(TAG, "Displaying cached AI advice for $city")
+                        Log.d(TAG, "Successfully retrieved cached AI advice for $city")
                         _aiAdviceState.value = NetworkResponse.Success(cached)
+                    } else {
+                        Log.d(TAG, "No cached AI advice found for $city")
                     }
                 }
             }
 
-            // Fetch from network
-            val result = repo.fetchAndSaveAIAdvice(city, healthCondition, activityLevel)
-            Log.d(TAG, "AI advice network fetch result: $result")
-            
-            if (result is NetworkResponse.Error && _aiAdviceState.value !is NetworkResponse.Success) {
-                _aiAdviceState.value = result
+            try {
+                // Fetch from network
+                Log.d(TAG, "Requesting fresh AI advice (Gemma 4) for $city...")
+                val result = repo.fetchAndSaveAIAdvice(city, healthCondition, activityLevel)
+                
+                when (result) {
+                    is NetworkResponse.Success -> {
+                        Log.i(TAG, "Successfully generated and saved AI advice for $city")
+                    }
+                    is NetworkResponse.Error -> {
+                        Log.e(TAG, "Failed to generate AI advice for $city: ${result.message}")
+                        if (_aiAdviceState.value !is NetworkResponse.Success) {
+                            _aiAdviceState.value = result
+                        }
+                    }
+                    else -> {
+                        Log.d(TAG, "AI advice request for $city returned state: $result")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Critical error during AI advice operation for $city", e)
+                if (_aiAdviceState.value !is NetworkResponse.Success) {
+                    _aiAdviceState.value = NetworkResponse.Error(e.message ?: "AI advice service unavailable")
+                }
             }
         }
     }

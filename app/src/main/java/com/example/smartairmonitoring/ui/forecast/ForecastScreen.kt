@@ -8,12 +8,15 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.*
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,28 +46,43 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBackClick: () -> Unit) {
     val forecastState by viewModel.forecastState.collectAsState()
     var infoDialogContent by remember { mutableStateOf<Pair<String, String>?>(null) }
     
-    val city = "Dushanbe"
+    val towns = listOf("Dushanbe", "Khujand", "Bokhtar", "Kulob", "Istaravshan", "Panjakent", "Khorugh", "Tursunzoda", "Hisor")
+    var location by remember { mutableStateOf("Dushanbe") }
+    var showLocationDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(selectedTab) {
+    LaunchedEffect(selectedTab, location) {
         val period = when (selectedTab) {
             "Today" -> "today"
             "Tomorrow" -> "tomorrow"
             "7 Days" -> "7days"
             else -> "today"
         }
-        viewModel.getForecast(city, period)
+        viewModel.getForecast(location, period)
     }
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Text(
-                        "Forecast",
-                        color = TextPrimary,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { showLocationDialog = true }
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            text = location,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        )
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = TextPrimary
+                        )
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
@@ -105,65 +123,109 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBackClick: () -> Unit) {
                 containerColor = BackgroundSecondary
             )
         }
-        Column(
+
+        if (showLocationDialog) {
+            AlertDialog(
+                onDismissRequest = { showLocationDialog = false },
+                title = { Text("Select City", color = TextPrimary) },
+                text = {
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        towns.forEach { town ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        showLocationDialog = false
+                                        location = town
+                                    }
+                                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(town, color = TextPrimary, fontSize = 16.sp)
+                            }
+                            HorizontalDivider(color = BackgroundElevated, thickness = 0.5.dp)
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { showLocationDialog = false }) {
+                        Text("Cancel", color = AIAccent)
+                    }
+                },
+                containerColor = BackgroundSecondary
+            )
+        }
+
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+            contentPadding = PaddingValues(bottom = 24.dp, top = 16.dp)
         ) {
-            // TABS
-            Surface(
-                color = BackgroundSecondary,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+            item {
+                // TABS
+                Surface(
+                    color = BackgroundSecondary,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    tabs.forEach { tab ->
-                        val isSelected = selectedTab == tab
-                        Surface(
-                            onClick = { selectedTab = tab },
-                            color = if (isSelected) Color.White.copy(alpha = 0.1f) else Color.Transparent,
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(
-                                text = tab,
-                                color = if (isSelected) TextPrimary else TextSecondary,
-                                modifier = Modifier.padding(vertical = 8.dp),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                fontSize = 14.sp,
-                                fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
-                            )
+                    Row(
+                        modifier = Modifier.padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        tabs.forEach { tab ->
+                            val isSelected = selectedTab == tab
+                            Surface(
+                                onClick = { selectedTab = tab },
+                                color = if (isSelected) Color.White.copy(alpha = 0.1f) else Color.Transparent,
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = tab,
+                                    color = if (isSelected) TextPrimary else TextSecondary,
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            key(selectedTab) {
-                when (val state = forecastState) {
-                    is NetworkResponse.Loading -> {
-                        Box(modifier = Modifier.fillMaxWidth().height(300.dp), contentAlignment = Alignment.Center) {
+            when (val state = forecastState) {
+                is NetworkResponse.Loading -> {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(300.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             CircularProgressIndicator(color = AIAccent)
                         }
                     }
-                    is NetworkResponse.Success -> {
-                        val data = state.data.data
-                        
-                        // Filter "Today" data to start from "Now" and only next 12 hours if possible
-                        val displayPoints = if (selectedTab == "Today") {
-                            filterTodayPoints(data.forecastPoints)
-                        } else {
-                            data.forecastPoints
-                        }
+                }
 
-                        val maxPm25 = displayPoints.maxOfOrNull { it.pm25 } ?: data.maxPm25
-                        val (statusText, statusColor) = getStatusFromPm25(maxPm25)
+                is NetworkResponse.Success -> {
+                    val data = state.data.data
 
+                    // Filter "Today" data to start from "Now" and only next 12 hours if possible
+                    val displayPoints = if (selectedTab == "Today") {
+                        filterTodayPoints(data.forecastPoints)
+                    } else {
+                        data.forecastPoints
+                    }
+
+                    val maxPm25 = displayPoints.maxOfOrNull { it.pm25 } ?: data.maxPm25
+                    val (statusText, statusColor) = getStatusFromPm25(maxPm25)
+
+                    item {
                         // HERO SECTION
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -188,7 +250,7 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBackClick: () -> Unit) {
                                     fontSize = 14.sp
                                 )
                             }
-                            
+
                             Icon(
                                 imageVector = if (statusText == "Good") Icons.Default.CheckCircle else Icons.Default.Warning,
                                 contentDescription = null,
@@ -196,10 +258,18 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBackClick: () -> Unit) {
                                 modifier = Modifier.size(64.dp)
                             )
                         }
+                    }
 
+                    item {
                         // CHART SECTION
-                        ForecastChartCard(displayPoints, statusText, isToday = selectedTab == "Today")
+                        ForecastChartCard(
+                            displayPoints,
+                            statusText,
+                            isToday = selectedTab == "Today" || selectedTab == "Tomorrow"
+                        )
+                    }
 
+                    item {
                         // DAILY OVERVIEW
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(
@@ -207,18 +277,26 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBackClick: () -> Unit) {
                                 color = TextPrimary,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold
-                            );
-                            
+                            )
+
                             DailyOverviewCard(displayPoints)
                         }
                     }
-                    is NetworkResponse.Error -> {
-                        Box(modifier = Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
+                }
+
+                is NetworkResponse.Error -> {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp), contentAlignment = Alignment.Center
+                        ) {
                             Text(text = state.message, color = Color.Red)
                         }
                     }
-                    else -> {}
                 }
+
+                else -> {}
             }
         }
     }
@@ -421,7 +499,7 @@ fun ForecastChartCard(points: List<ForecastPointDto>, maxLabel: String, isToday:
                             )
                             
                             // Time/Date Label
-                            val label = if (isToday && index == 0) "Now" else {
+                            val label = if (isToday && index == 0 && point.time != null) "Now" else {
                                 formatTimeLabel(point, isToday)
                             }
 

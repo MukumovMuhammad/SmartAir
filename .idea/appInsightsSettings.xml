@@ -9,9 +9,9 @@
               <option name="connection">
                 <ConnectionSetting>
                   <option name="appId" value="com.example.smartairmonitoring" />
-                  <option name="mobileSdkAppId" value="1:1042176330893:android:7dba15673a39374418e6c4" />
-                  <option name="projectId" value="smart-air-b112f" />
-                  <option name="projectNumber" value="1042176330893" />
+                  <option name="mobileSdkAppId" value="1:448681448130:android:3301bbeb279150518c615b" />
+                  <option name="projectId" value="gemma4-8e8c0" />
+                  <option name="projectNumber" value="448681448130" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

@@ -106,6 +106,7 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                     }
                     is NetworkResponse.Success -> {
                         val data = state.data.data
+                        
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = "Air Quality",
@@ -142,6 +143,28 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                         
                         Spacer(modifier = Modifier.height(40.dp))
                         
+                        // SEPARATE AI ADVICE SECTION (Powered by Gemma 4)
+                        when (val aiState = aiAdviceState) {
+                            is NetworkResponse.Loading -> {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(100.dp)
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .shimmerEffect()
+                                )
+                            }
+                            is NetworkResponse.Success -> {
+                                AIAdviceCard(advice = aiState.data.advice)
+                            }
+                            is NetworkResponse.Error -> {
+                                Text(text = "Could not fetch AI advice", color = Color.Red, fontSize = 12.sp)
+                            }
+                            else -> {}
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -176,28 +199,6 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                                     infoDialogContent = "O3 (Ozone)" to "Ground-level ozone is not emitted directly into the air, but is created by chemical reactions between oxides of nitrogen (NOx) and volatile organic compounds (VOC) in the presence of sunlight."
                                 }
                             )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(24.dp))
-                        
-                        // SEPARATE AI ADVICE SECTION
-                        when (val aiState = aiAdviceState) {
-                            is NetworkResponse.Loading -> {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(100.dp)
-                                        .clip(RoundedCornerShape(20.dp))
-                                        .shimmerEffect()
-                                )
-                            }
-                            is NetworkResponse.Success -> {
-                                AIAdviceCard(advice = aiState.data.advice)
-                            }
-                            is NetworkResponse.Error -> {
-                                Text(text = "Could not fetch AI advice", color = Color.Red, fontSize = 12.sp)
-                            }
-                            else -> {}
                         }
                         
                         Spacer(modifier = Modifier.height(24.dp))
@@ -549,7 +550,14 @@ fun AIAdviceCard(advice: String) {
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column {
-                Text(text = "AI Advice", color = AIAccent, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "AI Advice", color = AIAccent, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                    Text(text = "Powered by Gemma 4", color = AIAccent.copy(alpha = 0.6f), fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                }
                 Text(
                     text = advice,
                     color = TextPrimary,

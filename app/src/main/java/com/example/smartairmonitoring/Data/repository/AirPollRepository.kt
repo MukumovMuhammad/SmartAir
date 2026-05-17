@@ -84,9 +84,21 @@ class AirPollRepository @Inject constructor(
     suspend fun fetchAndSaveAIAdvice(city: String, healthCondition: String, activityLevel: String): NetworkResponse<AIAdviceResponse> = withContext(Dispatchers.IO) {
         try {
             val response = api.getAIAdvice(city, healthCondition, activityLevel)
+            
+            // Handle advice being either a String or an Array of Strings
+            val adviceText = when {
+                response.data.advice.isJsonArray -> {
+                    response.data.advice.asJsonArray.joinToString("\n") { it.asString }
+                }
+                response.data.advice.isJsonPrimitive -> {
+                    response.data.advice.asString
+                }
+                else -> response.data.advice.toString()
+            }
+
             val entity = AIAdviceEntity(
                 city = city,
-                advice = response.data.advice,
+                advice = adviceText,
                 aqi = response.data.aqi,
                 aqiLabel = response.data.aqiLabel,
                 healthCondition = response.data.healthCondition,
@@ -95,6 +107,7 @@ class AirPollRepository @Inject constructor(
             dao.insertAIAdvice(entity)
             NetworkResponse.Success(response)
         } catch (e: Exception) {
+            Log.e("AirPollRepository", "Error fetching AI advice", e)
             NetworkResponse.Error(e.message ?: "Failed to get AI advice")
         }
     }

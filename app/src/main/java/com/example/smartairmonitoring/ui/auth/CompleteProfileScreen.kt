@@ -8,12 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -73,164 +69,174 @@ fun CompleteProfileScreen(
         
         Box(modifier = Modifier.fillMaxSize().background(BackgroundDeepNavy.copy(alpha = 0.85f)))
 
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+            contentPadding = PaddingValues(bottom = 40.dp)
         ) {
-            Spacer(modifier = Modifier.height(60.dp))
+            item {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Spacer(modifier = Modifier.height(36.dp))
 
-            Text(
-                text = buildAnnotatedString {
-                    append("Complete ")
-                    withStyle(style = SpanStyle(color = AIAccent)) {
-                        append("Profile")
-                    }
-                },
-                color = TextPrimary,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
+                    Text(
+                        text = buildAnnotatedString {
+                            append("Complete ")
+                            withStyle(style = SpanStyle(color = AIAccent)) {
+                                append("Profile")
+                            }
+                        },
+                        color = TextPrimary,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
 
-            Text(
-                text = "Help us personalize your air quality insights",
-                color = TextSecondary,
-                fontSize = 16.sp,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-
-            Spacer(modifier = Modifier.height(40.dp))
+                    Text(
+                        text = "Help us personalize your air quality insights",
+                        color = TextSecondary,
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
 
             // Name Fields Section
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = BackgroundSecondary.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, BackgroundElevated)
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    AppTextField(
-                        value = firstName,
-                        onValueChange = { firstName = it },
-                        label = "First Name",
-                        placeholder = "Enter your first name",
-                        leadingIcon = Icons.Default.Person
-                    )
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = BackgroundSecondary.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(24.dp),
+                    border = BorderStroke(1.dp, BackgroundElevated)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        AppTextField(
+                            value = firstName,
+                            onValueChange = { firstName = it },
+                            label = "First Name",
+                            placeholder = "Enter your first name",
+                            leadingIcon = Icons.Default.Person
+                        )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                    AppTextField(
-                        value = surname,
-                        onValueChange = { surname = it },
-                        label = "Surname",
-                        placeholder = "Enter your surname",
-                        leadingIcon = Icons.Default.Person
-                    )
+                        AppTextField(
+                            value = surname,
+                            onValueChange = { surname = it },
+                            label = "Surname",
+                            placeholder = "Enter your surname",
+                            leadingIcon = Icons.Default.Person
+                        )
+                    }
                 }
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
 
             // Age Group Section
-            SectionHeader(title = "Your Age Group")
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 80.dp), // Adjust based on chip width
-                modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(ageGroups) { age ->
-                    SelectableChip(
-                        text = age,
-                        isSelected = (selectedAgeGroup == age),
-                        onClick = { selectedAgeGroup = age }
-                    )
+            item {
+                Column {
+                    SectionHeader(title = "Your Age Group")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        ageGroups.forEach { age ->
+                            SelectableChip(
+                                text = age,
+                                isSelected = (selectedAgeGroup == age),
+                                onClick = { selectedAgeGroup = age }
+                            )
+                        }
+                    }
                 }
             }
 
-
-            Spacer(modifier = Modifier.height(24.dp))
-
             // Health Conditions Section
-            SectionHeader(title = "Health Conditions", subtitle = "Select all that apply")
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 100.dp), // Adjust minSize to fit your chips
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 1000.dp) // Important: Give it a max height constraint
-                    .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                userScrollEnabled = false // Makes it behave like a standard FlowRow
-            ) {
-                items(healthConditions) { condition ->
-                    val isSelected = selectedConditions.contains(condition)
+            item {
+                Column {
+                    SectionHeader(title = "Health Conditions", subtitle = "Select all that apply")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        healthConditions.forEach { condition ->
+                            val isSelected = selectedConditions.contains(condition)
 
-                    SelectableChip(
-                        text = condition,
-                        isSelected = isSelected,
-                        showCheckbox = true,
-                        onClick = {
-                            selectedConditions = if (condition == "None") {
-                                if (isSelected) emptySet() else setOf("None")
-                            } else {
-                                val current = selectedConditions - "None"
-                                if (isSelected) current - condition else current + condition
-                            }
+                            SelectableChip(
+                                text = condition,
+                                isSelected = isSelected,
+                                showCheckbox = true,
+                                onClick = {
+                                    selectedConditions = if (condition == "None") {
+                                        if (isSelected) emptySet() else setOf("None")
+                                    } else {
+                                        val current = selectedConditions - "None"
+                                        if (isSelected) current - condition else current + condition
+                                    }
+                                }
+                            )
                         }
-                    )
+                    }
                 }
             }
 
             // "Others" Text Field
-            AnimatedVisibility(
-                visible = selectedConditions.contains("Others"),
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                    AppTextField(
-                        value = otherCondition,
-                        onValueChange = { otherCondition = it },
-                        label = "Specify Other Conditions",
-                        placeholder = "e.g., Sinusitis, Dust sensitivity",
-                        leadingIcon = Icons.Default.HealthAndSafety
-                    )
+            item {
+                AnimatedVisibility(
+                    visible = selectedConditions.contains("Others"),
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        AppTextField(
+                            value = otherCondition,
+                            onValueChange = { otherCondition = it },
+                            label = "Specify Other Conditions",
+                            placeholder = "e.g., Sinusitis, Dust sensitivity",
+                            leadingIcon = Icons.Default.HealthAndSafety
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(48.dp))
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (authState is AuthState.Loading) {
+                        CircularProgressIndicator(color = AIAccent, modifier = Modifier.size(48.dp))
+                    } else {
+                        PrimaryGradientButton(
+                            text = "Finish Registration",
+                            onClick = {
+                                if (firstName.isNotBlank() && surname.isNotBlank() && selectedAgeGroup.isNotBlank() && selectedConditions.isNotEmpty()) {
+                                    val finalConditionsSet = selectedConditions.toMutableSet()
+                                    if (finalConditionsSet.contains("Others")) {
+                                        finalConditionsSet.remove("Others")
+                                        if (otherCondition.isNotBlank()) {
+                                            finalConditionsSet.add(otherCondition)
+                                        }
+                                    }
 
-            if (authState is AuthState.Loading) {
-                CircularProgressIndicator(color = AIAccent, modifier = Modifier.size(48.dp))
-            } else {
-                PrimaryGradientButton(
-                    text = "Finish Registration",
-                    onClick = {
-                        if (firstName.isNotBlank() && surname.isNotBlank() && selectedAgeGroup.isNotBlank() && selectedConditions.isNotEmpty()) {
-                            val finalConditionsSet = selectedConditions.toMutableSet()
-                            if (finalConditionsSet.contains("Others")) {
-                                finalConditionsSet.remove("Others")
-                                if (otherCondition.isNotBlank()) {
-                                    finalConditionsSet.add(otherCondition)
+                                    viewModel.completeProfile(
+                                        firstName,
+                                        surname,
+                                        selectedAgeGroup,
+                                        finalConditionsSet.joinToString(", ")
+                                    )
+                                } else {
+                                    Toast.makeText(context, "Please complete all fields", Toast.LENGTH_SHORT).show()
                                 }
                             }
-                            
-                            viewModel.completeProfile(
-                                firstName, 
-                                surname, 
-                                selectedAgeGroup, 
-                                finalConditionsSet.joinToString(", ")
-                            )
-                        } else {
-                            Toast.makeText(context, "Please complete all fields", Toast.LENGTH_SHORT).show()
-                        }
+                        )
                     }
-                )
+                }
             }
-            Spacer(modifier = Modifier.height(40.dp))
         }
     }
 }
