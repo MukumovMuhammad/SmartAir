@@ -6,32 +6,32 @@ import retrofit2.http.Query
 
 interface AirPollApiService {
 
-    @GET("/api/air-pollution/")
+    @GET("api/air-pollution/")
     suspend fun getAirPollData(
         @Query("city") city: String = "Dushanbe"
     ): AirPollutionResponse
 
-    @GET("/api/air-pollution/all/")
+    @GET("api/air-pollution/all/")
     suspend fun getAllAirPollHistory(): AllAirPollutionResponse
 
-    @GET("/api/air-pollution/location/")
+    @GET("api/air-pollution/location/")
     suspend fun getAirPollByLocation(
         @Query("lat") lat: Float,
         @Query("lon") lon: Float
     ): Any // You might want to define a specific DTO for 3.3 as well
 
-    @GET("/api/forecast/")
+    @GET("api/forecast/")
     suspend fun getForecast(
         @Query("city") city: String = "Dushanbe",
         @Query("period") period: String = "today"
     ): ForecastResponse
 
-    @GET("/api/map/")
+    @GET("api/map/")
     suspend fun getMapData(
         @Query("pollutant") pollutant: String = "AQI"
     ): MapResponse
 
-    @GET("/api/advice/")
+    @GET("api/advice/")
     suspend fun getAIAdvice(
         @Query("city") city: String = "Dushanbe",
         @Query("health_condition") healthCondition: String = "None",

@@ -1,10 +1,12 @@
 package com.example.smartairmonitoring.ui.ai
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -20,25 +22,64 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.smartairmonitoring.Data.remote.dto.ChatMessageDto
+import com.example.smartairmonitoring.modul.core.network.NetworkResponse
+import com.example.smartairmonitoring.modul.core.network.RetrofitInstance
+import com.example.smartairmonitoring.Data.repository.ChatRepository
 import com.example.smartairmonitoring.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AIAssistantScreen(onBackClick: () -> Unit) {
+    val repository = remember { ChatRepository(RetrofitInstance.chatApi) }
+    val viewModel: ChatViewModel = viewModel(factory = ChatViewModel.Factory(repository))
+    
+    val messagesState by viewModel.messages.collectAsState()
+    val isSending by viewModel.isSending.collectAsState()
+    val currentSession by viewModel.currentSession.collectAsState()
+    
+    val listState = rememberLazyListState()
+
+    // Scroll to bottom when new messages arrive
+    LaunchedEffect(messagesState) {
+        if (messagesState is NetworkResponse.Success) {
+            val msgs = (messagesState as NetworkResponse.Success).data
+            if (msgs.isNotEmpty()) {
+                listState.animateScrollToItem(msgs.size)
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Text(
-                        "AI Assistant",
-                        color = TextPrimary,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            "AI Assistant",
+                            color = TextPrimary,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (currentSession != null) {
+                            Text(
+                                currentSession?.title ?: "",
+                                color = TextSecondary,
+                                fontSize = 12.sp,
+                                maxLines = 1
+                            )
+                        }
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.Default.ArrowBack, contentDescription = null, tint = TextPrimary)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.createNewSession() }) {
+                        Icon(Icons.Default.AddComment, contentDescription = "New Chat", tint = TextPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -47,40 +88,90 @@ fun AIAssistantScreen(onBackClick: () -> Unit) {
             )
         },
         bottomBar = {
-            ChatInputArea()
+            ChatInputArea(
+                onSend = { viewModel.sendMessage(it) },
+                enabled = !isSending
+            )
         },
         containerColor = BackgroundDeepNavy
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(vertical = 16.dp)
-        ) {
-            item {
-                AiriHeader()
-            }
-
-            item {
-                UserMessageBubble(
-                    message = "Can I go for a run outside today?",
-                    time = "09:41"
-                )
-            }
-
-            item {
-                AIMessageBubble(
-                    message = "I don't recommend outdoor running today.\n\nThe PM2.5 level is high (85 µg/m³) which can cause breathing discomfort and fatigue.\n\nTry exercising indoors instead.",
-                    time = "09:41"
-                )
-            }
-
-            item {
-                TipsCard()
+        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+            when (val state = messagesState) {
+                is NetworkResponse.Loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = AIAccent)
+                    }
+                }
+                is NetworkResponse.Success -> {
+                    val messages = state.data
+                    if (messages.isEmpty()) {
+                        AiriHeader()
+                    } else {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            contentPadding = PaddingValues(vertical = 16.dp)
+                        ) {
+                            items(messages) { msg ->
+                                if (msg.role == "user") {
+                                    UserMessageBubble(msg.content, formatTime(msg.createdAt))
+                                } else {
+                                    AIMessageBubble(msg.content, formatTime(msg.createdAt))
+                                }
+                            }
+                            
+                            if (isSending) {
+                                item {
+                                    AITypingIndicator()
+                                }
+                            }
+                        }
+                    }
+                }
+                is NetworkResponse.Error -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(state.message, color = Color.Red)
+                    }
+                }
+                else -> {
+                    AiriHeader()
+                }
             }
         }
+    }
+}
+
+@Composable
+fun AITypingIndicator() {
+    Row(
+        modifier = Modifier.padding(start = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        repeat(3) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(TextHint)
+            )
+        }
+    }
+}
+
+private fun formatTime(createdAt: String): String {
+    if (createdAt.isEmpty()) return ""
+    // Simple slice for "2026-05-16 09:01:00+05:00" -> "09:01"
+    return try {
+        if (createdAt.contains(" ")) {
+            createdAt.split(" ")[1].substring(0, 5)
+        } else {
+            ""
+        }
+    } catch (e: Exception) {
+        ""
     }
 }
 
@@ -89,13 +180,12 @@ fun AiriHeader() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 24.dp),
+            .padding(vertical = 48.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Robot Avatar Placeholder
         Box(
             modifier = Modifier
-                .size(80.dp)
+                .size(100.dp)
                 .clip(CircleShape)
                 .background(BackgroundSecondary),
             contentAlignment = Alignment.Center
@@ -104,34 +194,35 @@ fun AiriHeader() {
                 Icons.Default.SmartToy,
                 contentDescription = null,
                 tint = AIAccent,
-                modifier = Modifier.size(48.dp)
+                modifier = Modifier.size(60.dp)
             )
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         
         Text(
             "Hello! I'm Airi",
             color = TextPrimary,
-            fontSize = 22.sp,
+            fontSize = 26.sp,
             fontWeight = FontWeight.Bold
         )
         
         Text(
             "Powered by Gemma 4",
             color = AIAccent,
-            fontSize = 12.sp,
+            fontSize = 14.sp,
             fontWeight = FontWeight.Medium
         )
         
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
         
         Text(
             "Your AI air quality assistant, powered by the latest AI technology.\nHow can I help you today?",
             color = TextSecondary,
-            fontSize = 14.sp,
+            fontSize = 16.sp,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            lineHeight = 20.sp
+            lineHeight = 24.sp,
+            modifier = Modifier.padding(horizontal = 32.dp)
         )
     }
 }
@@ -143,7 +234,7 @@ fun UserMessageBubble(message: String, time: String) {
         horizontalAlignment = Alignment.End
     ) {
         Surface(
-            color = AQIUnhealthy, // Reddish color from design
+            color = AQIUnhealthy,
             shape = RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp)
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
@@ -152,22 +243,24 @@ fun UserMessageBubble(message: String, time: String) {
                     color = Color.White,
                     fontSize = 14.sp
                 )
-                Row(
-                    modifier = Modifier.align(Alignment.End),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = time,
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 10.sp
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        Icons.Default.DoneAll,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.size(12.dp)
-                    )
+                if (time.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.align(Alignment.End),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = time,
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 10.sp
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.DoneAll,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.7f),
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
                 }
             }
         }
@@ -191,73 +284,31 @@ fun AIMessageBubble(message: String, time: String) {
                     fontSize = 14.sp,
                     lineHeight = 20.sp
                 )
-                Text(
-                    text = time,
-                    color = TextHint,
-                    fontSize = 10.sp,
-                    modifier = Modifier.align(Alignment.End)
-                )
+                if (time.isNotEmpty()) {
+                    Text(
+                        text = time,
+                        color = TextHint,
+                        fontSize = 10.sp,
+                        modifier = Modifier.align(Alignment.End)
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-fun TipsCard() {
-    Surface(
-        color = ChatBackground,
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.fillMaxWidth(0.85f)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                "Tips for you",
-                color = TextPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            TipItem(Icons.Default.WbSunny, "Wear a mask if you must go outside.", AQIModerate)
-            TipItem(Icons.Default.HomeWork, "Keep windows closed.", AQIUnhealthySensitive)
-            TipItem(Icons.Outlined.WaterDrop, "Drink plenty of water.", AICyanGlow)
-        }
-    }
-}
-
-@Composable
-fun TipItem(icon: ImageVector, text: String, iconColor: Color) {
-    Row(
-        modifier = Modifier.padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = iconColor,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = text,
-            color = TextSecondary,
-            fontSize = 13.sp
-        )
-    }
-}
-
-@Composable
-fun ChatInputArea() {
+fun ChatInputArea(onSend: (String) -> Unit, enabled: Boolean) {
     var messageText by remember { mutableStateOf("") }
     
     Surface(
         color = BackgroundDeepNavy,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        tonalElevation = 8.dp
     ) {
         Row(
             modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -265,10 +316,10 @@ fun ChatInputArea() {
             TextField(
                 value = messageText,
                 onValueChange = { messageText = it },
-                placeholder = { Text("Ask something...", color = TextHint, fontSize = 14.sp) },
+                placeholder = { Text("Ask about air quality...", color = TextHint, fontSize = 14.sp) },
                 modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 48.dp),
+                    .weight(1f),
+                enabled = enabled,
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = BackgroundSecondary,
                     unfocusedContainerColor = BackgroundSecondary,
@@ -279,18 +330,18 @@ fun ChatInputArea() {
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary
                 ),
-                shape = RoundedCornerShape(24.dp)
+                shape = RoundedCornerShape(24.dp),
+                maxLines = 4
             )
 
             Box(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(AQIUnhealthy) // Red send button from design
-                    .clickable { 
-                        if (messageText.isNotBlank()) {
-                            messageText = "" 
-                        }
+                    .background(if (messageText.isNotBlank() && enabled) AQIUnhealthy else BackgroundSecondary)
+                    .clickable(enabled = messageText.isNotBlank() && enabled) { 
+                        onSend(messageText)
+                        messageText = ""
                     },
                 contentAlignment = Alignment.Center
             ) {
