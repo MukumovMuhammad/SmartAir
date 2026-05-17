@@ -207,7 +207,7 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBackClick: () -> Unit) {
                                 color = TextPrimary,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold
-                            )
+                            );
                             
                             DailyOverviewCard(displayPoints)
                         }

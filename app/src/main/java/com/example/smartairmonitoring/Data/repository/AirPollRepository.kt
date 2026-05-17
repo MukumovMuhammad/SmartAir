@@ -2,6 +2,7 @@ package com.example.smartairmonitoring.Data.repository
 
 import android.util.Log
 import com.example.smartairmonitoring.Data.local.AirPollDao
+import com.example.smartairmonitoring.Data.local.entities.AIAdviceEntity
 import com.example.smartairmonitoring.Data.local.entities.AirPollData
 import com.example.smartairmonitoring.Data.local.entities.AirPollEntity
 import com.example.smartairmonitoring.Data.local.entities.ForecastEntity
@@ -80,12 +81,27 @@ class AirPollRepository @Inject constructor(
     fun getLocalMapData(pollutant: String): Flow<MapEntity?> = 
         dao.getMapData(pollutant)
 
-    suspend fun getAIAdvice(city: String, healthCondition: String, activityLevel: String): NetworkResponse<AIAdviceResponse> {
-        return try {
+    suspend fun fetchAndSaveAIAdvice(city: String, healthCondition: String, activityLevel: String): NetworkResponse<AIAdviceResponse> = withContext(Dispatchers.IO) {
+        try {
             val response = api.getAIAdvice(city, healthCondition, activityLevel)
+            val entity = AIAdviceEntity(
+                city = city,
+                advice = response.data.advice,
+                aqi = response.data.aqi,
+                aqiLabel = response.data.aqiLabel,
+                healthCondition = response.data.healthCondition,
+                activityLevel = response.data.activityLevel
+            )
+            dao.insertAIAdvice(entity)
             NetworkResponse.Success(response)
         } catch (e: Exception) {
             NetworkResponse.Error(e.message ?: "Failed to get AI advice")
         }
+    }
+
+    fun getLocalAIAdvice(city: String): Flow<AIAdviceEntity?> = dao.getAIAdvice(city)
+
+    suspend fun getAIAdvice(city: String, healthCondition: String, activityLevel: String): NetworkResponse<AIAdviceResponse> {
+        return fetchAndSaveAIAdvice(city, healthCondition, activityLevel)
     }
 }

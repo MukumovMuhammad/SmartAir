@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import com.example.smartairmonitoring.Data.local.entities.AIAdviceEntity
 import com.example.smartairmonitoring.Data.local.entities.AirPollEntity
 import com.example.smartairmonitoring.Data.local.entities.ForecastEntity
 import com.example.smartairmonitoring.Data.local.entities.MapEntity
@@ -36,4 +37,10 @@ interface AirPollDao {
 
     @Query("SELECT * FROM map_data WHERE pollutant = :pollutant LIMIT 1")
     fun getMapData(pollutant: String): Flow<MapEntity?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAIAdvice(advice: AIAdviceEntity)
+
+    @Query("SELECT * FROM ai_advice WHERE city = :city LIMIT 1")
+    fun getAIAdvice(city: String): Flow<AIAdviceEntity?>
 }

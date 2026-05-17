@@ -34,15 +34,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.example.smartairmonitoring.R
+import com.example.smartairmonitoring.Data.local.entities.AIAdviceEntity
 import com.example.smartairmonitoring.modul.core.network.NetworkResponse
 import com.example.smartairmonitoring.ui.components.shimmerEffect
 import com.example.smartairmonitoring.ui.theme.*
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Locale
 
 @Composable
 fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
     val homeState by viewModel.homeState.collectAsState()
+    val aiAdviceState by viewModel.aiAdviceState.collectAsState()
     var showLocationDialog by remember { mutableStateOf(false) }
     var infoDialogContent by remember { mutableStateOf<Pair<String, String>?>(null) }
 
@@ -60,6 +63,7 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
 
     LaunchedEffect(Unit, location) {
         viewModel.getCityAirData(location)
+        viewModel.getAIAdvice(location)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -85,22 +89,23 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
             },
             containerColor = Color.Transparent
         ) { padding ->
-            when (val state = homeState) {
-                is NetworkResponse.Loading -> {
-                    Box(modifier = Modifier.padding(padding)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                when (val state = homeState) {
+                    is NetworkResponse.Loading -> {
+                        // We could keep HomeShimmer for everything except AIAdvice,
+                        // but the user wants AI advice to shimmer separately.
+                        // For now, let's keep the main shimmer.
                         HomeShimmer()
                     }
-                }
-                is NetworkResponse.Success -> {
-                    val data = state.data.data
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding)
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 20.dp, vertical = 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    is NetworkResponse.Success -> {
+                        val data = state.data.data
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = "Air Quality",
@@ -175,7 +180,25 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                         
                         Spacer(modifier = Modifier.height(24.dp))
                         
-                        AIAdviceCard()
+                        // SEPARATE AI ADVICE SECTION
+                        when (val aiState = aiAdviceState) {
+                            is NetworkResponse.Loading -> {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(100.dp)
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .shimmerEffect()
+                                )
+                            }
+                            is NetworkResponse.Success -> {
+                                AIAdviceCard(advice = aiState.data.advice)
+                            }
+                            is NetworkResponse.Error -> {
+                                Text(text = "Could not fetch AI advice", color = Color.Red, fontSize = 12.sp)
+                            }
+                            else -> {}
+                        }
                         
                         Spacer(modifier = Modifier.height(24.dp))
                         
@@ -190,13 +213,13 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                         
                         Spacer(modifier = Modifier.height(100.dp))
                     }
-                }
-                is NetworkResponse.Error -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(text = state.message, color = Color.White)
+                    is NetworkResponse.Error -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(text = state.message, color = Color.White)
+                        }
                     }
+                    else -> {}
                 }
-                else -> {}
             }
         }
     }
@@ -494,9 +517,13 @@ fun InfoCard(
 }
 
 @Composable
-fun AIAdviceCard() {
+fun AIAdviceCard(advice: String) {
     var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { visible = true }
+    LaunchedEffect(advice) { 
+        visible = false
+        delay(100)
+        visible = true 
+    }
 
     AnimatedVisibility(
         visible = visible,
@@ -524,7 +551,7 @@ fun AIAdviceCard() {
             Column {
                 Text(text = "AI Advice", color = AIAccent, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
                 Text(
-                    text = "Air quality is unhealthy today. Avoid outdoor activities, keep windows closed and stay hydrated.",
+                    text = advice,
                     color = TextPrimary,
                     fontSize = 13.sp,
                     lineHeight = 18.sp
