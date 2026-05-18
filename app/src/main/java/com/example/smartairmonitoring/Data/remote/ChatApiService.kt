@@ -5,7 +5,7 @@ import retrofit2.http.*
 
 interface ChatApiService {
 
-    @POST("api/chat/sessions/create/")
+    @POST("api/chat/sessions/")
     suspend fun createSession(@Body request: ChatSessionRequest): ChatSessionResponse
 
     @GET("api/chat/users/{user_uid}/sessions/")
@@ -14,10 +14,10 @@ interface ChatApiService {
     @GET("api/chat/sessions/{session_id}/messages/")
     suspend fun getSessionMessages(@Path("session_id", encoded = true) sessionId: String): ChatMessagesResponse
 
-    @POST("api/chat/sessions/{session_id}/message/")
+    @POST("api/chat/sessions/{session_id}/send/")
     suspend fun sendMessage(
         @Path("session_id", encoded = true) sessionId: String,
-        @Body request: SendMessageRequest
+        @Body request: SendMessageRequest,
     ): SendMessageResponse
 
     @DELETE("api/chat/sessions/{session_id}/delete/")

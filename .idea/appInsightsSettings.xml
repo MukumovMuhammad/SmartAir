@@ -6,14 +6,6 @@
         <entry key="Firebase Crashlytics">
           <value>
             <InsightsFilterSettings>
-              <option name="connection">
-                <ConnectionSetting>
-                  <option name="appId" value="com.example.smartairmonitoring" />
-                  <option name="mobileSdkAppId" value="1:448681448130:android:3301bbeb279150518c615b" />
-                  <option name="projectId" value="gemma4-8e8c0" />
-                  <option name="projectNumber" value="448681448130" />
-                </ConnectionSetting>
-              </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />
               <option name="timeIntervalDays" value="THIRTY_DAYS" />
               <option name="visibilityType" value="ALL" />

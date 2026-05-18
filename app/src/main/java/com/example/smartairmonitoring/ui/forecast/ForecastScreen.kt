@@ -303,22 +303,16 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBackClick: () -> Unit) {
 }
 
 private fun filterTodayPoints(points: List<ForecastPointDto>): List<ForecastPointDto> {
-    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-    val now = Calendar.getInstance().time
+    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val now = Calendar.getInstance()
+    val todayDateString = sdf.format(now.time)
     
-    // Sort and filter points that are in the future
-    val futurePoints = points.filter { point ->
-        point.time?.let {
-            try {
-                val pointTime = sdf.parse(it)
-                pointTime != null && pointTime.after(now)
-            } catch (e: Exception) {
-                true
-            }
-        } ?: true
-    }.take(12) // Next 12 hours (assuming 1-hour intervals or just next 12 data points)
+    // Filter points that are from today (comparing just the date part)
+    val todayPoints = points.filter { point ->
+        point.time?.startsWith(todayDateString) == true
+    }
 
-    return futurePoints
+    return if (todayPoints.isNotEmpty()) todayPoints else points.take(12)
 }
 
 fun getAQIColorFromLabel(label: String): Color {

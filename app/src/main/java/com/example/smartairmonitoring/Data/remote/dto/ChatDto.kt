@@ -4,8 +4,7 @@ import com.google.gson.annotations.SerializedName
 
 data class ChatSessionRequest(
     @SerializedName("user_uid") val userUid: String,
-    @SerializedName("title") val title: String? = null,
-    @SerializedName("csrfmiddlewaretoken") val csrfToken: String? = null
+    @SerializedName("title") val title: String? = null
 )
 
 data class ChatSessionResponse(
@@ -19,7 +18,7 @@ data class ChatSessionsListResponse(
 )
 
 data class ChatSessionDto(
-    @SerializedName("id") val id: String,
+    @SerializedName("chat_id") val id: String?,
     @SerializedName("user_uid") val userUid: String,
     @SerializedName("title") val title: String,
     @SerializedName("created_at") val createdAt: String,
@@ -32,9 +31,9 @@ data class ChatMessagesResponse(
 )
 
 data class ChatMessageDto(
-    @SerializedName("id") val id: String,
-    @SerializedName("chat_id") val chatId: String,
-    @SerializedName("role") val role: String,
+    @SerializedName("id") val id: String?,
+    @SerializedName("chat_id") val chatId: String?,
+    @SerializedName("role") val role: String, // "user", "assistant", or "ai"
     @SerializedName("content") val content: String,
     @SerializedName("created_at") val createdAt: String
 )

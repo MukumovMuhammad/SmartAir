@@ -14,6 +14,7 @@ import com.example.smartairmonitoring.Data.remote.dto.ForecastResponse
 import com.example.smartairmonitoring.Data.remote.dto.MapResponse
 import com.example.smartairmonitoring.Data.remote.dto.toEntity
 import com.example.smartairmonitoring.modul.core.network.NetworkResponse
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -33,12 +34,13 @@ class AirPollRepository @Inject constructor(
             dao.insertAirPollution(response.toEntity())
             NetworkResponse.Success(response.toEntity())
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             NetworkResponse.Error(e.message ?: "Failed to fetch air pollution data")
         }
     }
 
-    suspend fun getForecast(city: String, period: String): NetworkResponse<ForecastResponse> {
-        return try {
+    suspend fun getForecast(city: String, period: String): NetworkResponse<ForecastResponse> = withContext(Dispatchers.IO) {
+        try {
             val response = api.getForecast(city, period)
             // Save to Room
             val entity = ForecastEntity(
@@ -53,6 +55,7 @@ class AirPollRepository @Inject constructor(
             dao.insertForecast(entity)
             NetworkResponse.Success(response)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Log.e("AirPollRepository", "Error fetching forecast", e)
             NetworkResponse.Error(e.message ?: "Failed to fetch forecast")
         }
@@ -61,9 +64,9 @@ class AirPollRepository @Inject constructor(
     fun getLocalForecast(city: String, period: String): Flow<ForecastEntity?> = 
         dao.getForecast(city, period)
 
-    suspend fun getMapData(pollutant: String): NetworkResponse<MapResponse> {
+    suspend fun getMapData(pollutant: String): NetworkResponse<MapResponse> = withContext(Dispatchers.IO) {
         Log.d("AirPollRepository", "API Call: getMapData(pollutant=$pollutant)")
-        return try {
+        try {
             val response = api.getMapData(pollutant)
             // Save to Room
             val entity = MapEntity(
@@ -73,6 +76,7 @@ class AirPollRepository @Inject constructor(
             dao.insertMapData(entity)
             NetworkResponse.Success(response)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Log.e("AirPollRepository", "API Error in getMapData", e)
             NetworkResponse.Error(e.message ?: "Failed to fetch map data")
         }
@@ -107,6 +111,7 @@ class AirPollRepository @Inject constructor(
             dao.insertAIAdvice(entity)
             NetworkResponse.Success(response)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Log.e("AirPollRepository", "Error fetching AI advice", e)
             NetworkResponse.Error(e.message ?: "Failed to get AI advice")
         }

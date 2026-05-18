@@ -9,135 +9,209 @@ import com.example.smartairmonitoring.Data.remote.dto.ChatSessionDto
 import com.example.smartairmonitoring.Data.repository.ChatRepository
 import com.example.smartairmonitoring.modul.core.network.NetworkResponse
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
 
-    private val TAG = "ChatViewModel_TAG"
+    private val tag = "ChatViewModel_TAG"
     private val auth = FirebaseAuth.getInstance()
 
-    private val _sessions = MutableStateFlow<NetworkResponse<List<ChatSessionDto>>>(NetworkResponse.Idle)
+    // SESSION LIST
+    private val _sessions =
+        MutableStateFlow<NetworkResponse<List<ChatSessionDto>>>(NetworkResponse.Idle)
     val sessions = _sessions.asStateFlow()
 
-    private val _messages = MutableStateFlow<NetworkResponse<List<ChatMessageDto>>>(NetworkResponse.Idle)
+    // MESSAGES
+    private val _messages =
+        MutableStateFlow<NetworkResponse<List<ChatMessageDto>>>(NetworkResponse.Idle)
     val messages = _messages.asStateFlow()
 
+    // CURRENT SESSION
     private val _currentSession = MutableStateFlow<ChatSessionDto?>(null)
     val currentSession = _currentSession.asStateFlow()
 
+    // LOADING STATE
     private val _isSending = MutableStateFlow(false)
     val isSending = _isSending.asStateFlow()
 
+    private var fetchMessagesJob: Job? = null
+
+    init {
+        fetchSessions()
+    }
+
+    // ---------------------------------------------------
+    // SAFE ID HANDLER (FIXED)
+    // ---------------------------------------------------
+    private fun getId(id: String?): String? {
+        if (id == null) return null
+        return if (id.contains("/")) id.substringAfterLast("/") else id
+    }
+
+    // ---------------------------------------------------
+    // LOAD SESSIONS
+    // ---------------------------------------------------
     fun fetchSessions() {
         val userUid = auth.currentUser?.uid ?: return
+
         viewModelScope.launch {
             _sessions.value = NetworkResponse.Loading
             _sessions.value = repository.getUserSessions(userUid)
         }
     }
 
+    // ---------------------------------------------------
+    // SELECT SESSION (FIXED)
+    // ---------------------------------------------------
     fun selectSession(session: ChatSessionDto) {
         _currentSession.value = session
-        fetchMessages(session.id)
-    }
 
-    fun createNewSession(title: String? = null) {
-        val userUid = auth.currentUser?.uid ?: return
-        viewModelScope.launch {
-            _sessions.value = NetworkResponse.Loading
-            
-            // Handshake: Ensure we have a CSRF cookie by performing a GET request first
-            repository.getUserSessions(userUid)
-            
-            val result = repository.createSession(userUid, title)
-            if (result is NetworkResponse.Success) {
-                _currentSession.value = result.data
-                _messages.value = NetworkResponse.Success(emptyList())
-                fetchSessions() // Refresh sessions list
-            } else if (result is NetworkResponse.Error) {
-                // IMPORTANT: Update messages state so the UI shows the error
-                _messages.value = result
-                Log.e(TAG, "Failed to create session: ${result.message}")
-            }
+        // IMPORTANT: reset UI first
+        _messages.value = NetworkResponse.Loading
+
+        val id = getId(session.id)
+        if (id != null) {
+            fetchMessages(id)
         }
     }
 
+    // ---------------------------------------------------
+    // START NEW CHAT (FIXED)
+    // ---------------------------------------------------
+    fun startNewChat() {
+        _currentSession.value = null
+        _messages.value = NetworkResponse.Idle
+    }
+
+    // ---------------------------------------------------
+    // FETCH MESSAGES
+    // ---------------------------------------------------
     private fun fetchMessages(sessionId: String) {
-        viewModelScope.launch {
+        fetchMessagesJob?.cancel()
+
+        fetchMessagesJob = viewModelScope.launch {
             _messages.value = NetworkResponse.Loading
             _messages.value = repository.getSessionMessages(sessionId)
         }
     }
 
+    // ---------------------------------------------------
+    // SEND MESSAGE (FIXED + SAFE)
+    // ---------------------------------------------------
     fun sendMessage(text: String) {
+        if (text.isBlank()) return
+
         val session = _currentSession.value
-        if (session == null) {
-            // If no session, create one first then send
-            val userUid = auth.currentUser?.uid ?: return
-            viewModelScope.launch {
-                _isSending.value = true
-                
-                // Handshake: Ensure we have a CSRF cookie
-                repository.getUserSessions(userUid)
+        val sessionId = getId(session?.id)
 
-                val createResult = repository.createSession(userUid)
-                if (createResult is NetworkResponse.Success) {
-                    _currentSession.value = createResult.data
-                    sendInternal(createResult.data.id, text)
-                    fetchSessions()
-                } else if (createResult is NetworkResponse.Error) {
-                    Log.e(TAG, "Failed to create session for message: ${createResult.message}")
-                    _messages.value = createResult // Show error in chat area
-                    _isSending.value = false
-                }
-            }
-        } else {
-            viewModelScope.launch {
-                sendInternal(session.id, text)
-            }
-        }
-    }
-
-    private suspend fun sendInternal(sessionId: String, text: String) {
-        _isSending.value = true
-        
-        // Optimistically add user message if we already have messages
-        val currentMsgs = (_messages.value as? NetworkResponse.Success)?.data ?: emptyList()
-        // Note: ID and timestamp are temp
-        val tempUserMsg = ChatMessageDto(
-            id = "temp_${System.currentTimeMillis()}",
-            chatId = sessionId,
-            role = "user",
-            content = text,
-            createdAt = ""
-        )
-        _messages.value = NetworkResponse.Success(currentMsgs + tempUserMsg)
-
-        val result = repository.sendMessage(sessionId, text)
-        if (result is NetworkResponse.Success) {
-            // Replace with actual messages from server to keep everything in sync
-            // The API returns both messages and updated title
-            val newData = result.data
-            _messages.value = NetworkResponse.Success(currentMsgs + newData.userMessage + newData.aiMessage)
-            
-            // Update session title if it changed
-            if (_currentSession.value?.title != newData.sessionTitle) {
-                _currentSession.value = _currentSession.value?.copy(title = newData.sessionTitle)
-                fetchSessions()
-            }
-        } else if (result is NetworkResponse.Error) {
-            // Rollback optimistic update or show error
-            Log.e(TAG, "Failed to send: ${result.message}")
-            // Optional: provide error feedback in UI
-        }
-        _isSending.value = false
-    }
-
-    fun deleteSession(sessionId: String) {
         viewModelScope.launch {
-            val result = repository.deleteSession(sessionId)
+            _isSending.value = true
+
+            // 1. Optimistic user message
+            val tempId = "temp_${System.currentTimeMillis()}"
+
+            val tempUserMsg = ChatMessageDto(
+                id = tempId,
+                chatId = sessionId,
+                role = "user",
+                content = text,
+                createdAt = ""
+            )
+
+            _messages.update { state ->
+                val current = (state as? NetworkResponse.Success)?.data ?: emptyList()
+                NetworkResponse.Success(current + tempUserMsg)
+            }
+
+            try {
+                var targetSessionId = sessionId
+
+                // 2. CREATE SESSION IF NULL
+                if (targetSessionId == null) {
+                    val userUid = auth.currentUser?.uid ?: "anonymous"
+                    val title = if (text.length > 30) text.take(27) + "..." else text
+
+                    val createResult = repository.createSession(userUid, title)
+
+                    if (createResult is NetworkResponse.Success) {
+                        val newSession = createResult.data
+                        _currentSession.value = newSession
+                        targetSessionId = getId(newSession.id)
+
+                        if (targetSessionId == null) {
+                            Log.e(tag, "Session created but ID is null: ${newSession}")
+                            _messages.value = NetworkResponse.Error("Session created but ID is missing")
+                            return@launch
+                        }
+                        fetchSessions()
+                    } else if (createResult is NetworkResponse.Error) {
+                        _messages.value = NetworkResponse.Error("Failed to create chat session: ${createResult.message}")
+                        return@launch
+                    }
+                }
+
+                // 3. SEND MESSAGE
+                if (targetSessionId != null) {
+                    val result = repository.sendMessage(targetSessionId, text)
+
+                    if (result is NetworkResponse.Success) {
+                        val newData = result.data
+
+                        // IMPORTANT: Save session ID from response if it was missing or different
+                        val responseSessionId = newData.userMessage.chatId
+                        if (responseSessionId != null && (_currentSession.value?.id == null || _currentSession.value?.id != responseSessionId)) {
+                             _currentSession.update { current ->
+                                 current?.copy(id = responseSessionId) ?: ChatSessionDto(
+                                     id = responseSessionId,
+                                     userUid = auth.currentUser?.uid ?: "anonymous",
+                                     title = newData.sessionTitle,
+                                     createdAt = "",
+                                     updatedAt = null
+                                 )
+                             }
+                        }
+
+                        _messages.update { state ->
+                            val current = (state as? NetworkResponse.Success)?.data ?: emptyList()
+                            val filtered = current.filter { it.id != tempId }
+                            NetworkResponse.Success(filtered + newData.userMessage + newData.aiMessage)
+                        }
+
+                        // update session title if changed
+                        if (_currentSession.value?.title != newData.sessionTitle) {
+                            _currentSession.value = _currentSession.value?.copy(title = newData.sessionTitle)
+                            fetchSessions()
+                        }
+                    } else if (result is NetworkResponse.Error) {
+                        _messages.value = NetworkResponse.Error(result.message)
+                    }
+                } else {
+                    _messages.value = NetworkResponse.Error("Critical Error: Session ID is still null")
+                }
+
+            } catch (e: Exception) {
+                Log.e(tag, "sendMessage error", e)
+                _messages.value =
+                    NetworkResponse.Error(e.message ?: "Unknown error")
+            } finally {
+                _isSending.value = false
+            }
+        }
+    }
+
+    // ---------------------------------------------------
+    // DELETE SESSION
+    // ---------------------------------------------------
+    fun deleteSession(sessionId: String?) {
+        val id = getId(sessionId) ?: return
+
+        viewModelScope.launch {
+            val result = repository.deleteSession(id)
+
             if (result is NetworkResponse.Success) {
                 if (_currentSession.value?.id == sessionId) {
                     _currentSession.value = null
@@ -148,7 +222,33 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
         }
     }
 
-    class Factory(private val repository: ChatRepository) : ViewModelProvider.Factory {
+    // ---------------------------------------------------
+    // RENAME SESSION
+    // ---------------------------------------------------
+    fun renameSession(sessionId: String?, newTitle: String) {
+        val id = getId(sessionId) ?: return
+        if (newTitle.isBlank()) return
+
+        viewModelScope.launch {
+            val result = repository.updateSessionTitle(id, newTitle)
+
+            if (result is NetworkResponse.Success) {
+                // If it's the current session, update the local state
+                if (_currentSession.value?.id == sessionId) {
+                    _currentSession.value = result.data
+                }
+                fetchSessions()
+            }
+        }
+    }
+
+    // ---------------------------------------------------
+    // FACTORY
+    // ---------------------------------------------------
+    class Factory(
+        private val repository: ChatRepository
+    ) : ViewModelProvider.Factory {
+
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(ChatViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
