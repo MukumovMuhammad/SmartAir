@@ -117,7 +117,10 @@ fun AIAssistantScreen(onBackClick: () -> Unit) {
                         }
                     },
                     navigationIcon = {
-                        Row {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = onBackClick) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                            }
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
                                 Icon(Icons.Default.Menu, contentDescription = "History", tint = TextPrimary)
                             }
@@ -154,6 +157,7 @@ fun AIAssistantScreen(onBackClick: () -> Unit) {
                             AiriHeader(onSuggestionClick = { viewModel.sendMessage(it) })
                         } else {
                             LazyColumn(
+
                                 state = listState,
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -239,6 +243,7 @@ fun AIAssistantScreen(onBackClick: () -> Unit) {
             containerColor = BackgroundSecondary
         )
     }
+
 }
 
 @Composable

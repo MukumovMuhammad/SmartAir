@@ -19,6 +19,9 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,11 +47,14 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBackClick: () -> Unit) {
     var selectedTab by remember { mutableStateOf("Today") }
     val tabs = listOf("Today", "Tomorrow", "7 Days")
     val forecastState by viewModel.forecastState.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     var infoDialogContent by remember { mutableStateOf<Pair<String, String>?>(null) }
     
     val towns = listOf("Dushanbe", "Khujand", "Bokhtar", "Kulob", "Istaravshan", "Panjakent", "Khorugh", "Tursunzoda", "Hisor")
     var location by remember { mutableStateOf("Dushanbe") }
     var showLocationDialog by remember { mutableStateOf(false) }
+
+    val pullToRefreshState = rememberPullToRefreshState()
 
     LaunchedEffect(selectedTab, location) {
         val period = when (selectedTab) {
@@ -157,146 +163,169 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBackClick: () -> Unit) {
             )
         }
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            contentPadding = PaddingValues(bottom = 24.dp, top = 16.dp)
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { 
+                val period = when (selectedTab) {
+                    "Today" -> "today"
+                    "Tomorrow" -> "tomorrow"
+                    "7 Days" -> "7days"
+                    else -> "today"
+                }
+                viewModel.refresh(location, period) 
+            },
+            state = pullToRefreshState,
+            indicator = {
+                PullToRefreshDefaults.Indicator(
+                    state = pullToRefreshState,
+                    isRefreshing = isRefreshing,
+                    containerColor = BackgroundSecondary,
+                    color = AIAccent,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
+            },
+            modifier = Modifier.padding(padding)
         ) {
-            item {
-                // TABS
-                Surface(
-                    color = BackgroundSecondary,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+                contentPadding = PaddingValues(bottom = 24.dp, top = 16.dp)
+            ) {
+                item {
+                    // TABS
+                    Surface(
+                        color = BackgroundSecondary,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        tabs.forEach { tab ->
-                            val isSelected = selectedTab == tab
-                            Surface(
-                                onClick = { selectedTab = tab },
-                                color = if (isSelected) Color.White.copy(alpha = 0.1f) else Color.Transparent,
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    text = tab,
-                                    color = if (isSelected) TextPrimary else TextSecondary,
-                                    modifier = Modifier.padding(vertical = 8.dp),
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    fontSize = 14.sp,
-                                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            when (val state = forecastState) {
-                is NetworkResponse.Loading -> {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(300.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(color = AIAccent)
-                        }
-                    }
-                }
-
-                is NetworkResponse.Success -> {
-                    val data = state.data.data
-
-                    // Filter "Today" data to start from "Now" and only next 12 hours if possible
-                    val displayPoints = if (selectedTab == "Today") {
-                        filterTodayPoints(data.forecastPoints)
-                    } else {
-                        data.forecastPoints
-                    }
-
-                    val maxPm25 = displayPoints.maxOfOrNull { it.pm25 } ?: data.maxPm25
-                    val (statusText, statusColor) = getStatusFromPm25(maxPm25)
-
-                    item {
-                        // HERO SECTION
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            modifier = Modifier.padding(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Column {
-                                Text(
-                                    selectedTab,
-                                    color = TextSecondary,
-                                    fontSize = 16.sp
-                                )
-                                Text(
-                                    statusText,
-                                    color = statusColor,
-                                    fontSize = 32.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    "PM2.5 may reach ${maxPm25.toInt()}",
-                                    color = TextHint,
-                                    fontSize = 14.sp
+                            tabs.forEach { tab ->
+                                val isSelected = selectedTab == tab
+                                Surface(
+                                    onClick = { selectedTab = tab },
+                                    color = if (isSelected) Color.White.copy(alpha = 0.1f) else Color.Transparent,
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = tab,
+                                        color = if (isSelected) TextPrimary else TextSecondary,
+                                        modifier = Modifier.padding(vertical = 8.dp),
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        fontSize = 14.sp,
+                                        fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                when (val state = forecastState) {
+                    is NetworkResponse.Loading -> {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(300.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = AIAccent)
+                            }
+                        }
+                    }
+
+                    is NetworkResponse.Success -> {
+                        val data = state.data.data
+
+                        // Filter "Today" data to start from "Now" and only next 12 hours if possible
+                        val displayPoints = if (selectedTab == "Today") {
+                            filterTodayPoints(data.forecastPoints)
+                        } else {
+                            data.forecastPoints
+                        }
+
+                        val maxPm25 = displayPoints.maxOfOrNull { it.pm25 } ?: data.maxPm25
+                        val (statusText, statusColor) = getStatusFromPm25(maxPm25)
+
+                        item {
+                            // HERO SECTION
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text(
+                                        selectedTab,
+                                        color = TextSecondary,
+                                        fontSize = 16.sp
+                                    )
+                                    Text(
+                                        statusText,
+                                        color = statusColor,
+                                        fontSize = 32.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        "PM2.5 may reach ${maxPm25.toInt()}",
+                                        color = TextHint,
+                                        fontSize = 14.sp
+                                    )
+                                }
+
+                                Icon(
+                                    imageVector = if (statusText == "Good") Icons.Default.CheckCircle else Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = statusColor,
+                                    modifier = Modifier.size(64.dp)
                                 )
                             }
+                        }
 
-                            Icon(
-                                imageVector = if (statusText == "Good") Icons.Default.CheckCircle else Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = statusColor,
-                                modifier = Modifier.size(64.dp)
+                        item {
+                            // CHART SECTION
+                            ForecastChartCard(
+                                displayPoints,
+                                statusText,
+                                isToday = selectedTab == "Today" || selectedTab == "Tomorrow"
                             )
                         }
-                    }
 
-                    item {
-                        // CHART SECTION
-                        ForecastChartCard(
-                            displayPoints,
-                            statusText,
-                            isToday = selectedTab == "Today" || selectedTab == "Tomorrow"
-                        )
-                    }
+                        item {
+                            // DAILY OVERVIEW
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text(
+                                    if (selectedTab == "7 Days") "7 Days Forecast" else "Daily Overview",
+                                    color = TextPrimary,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
 
-                    item {
-                        // DAILY OVERVIEW
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(
-                                if (selectedTab == "7 Days") "7 Days Forecast" else "Daily Overview",
-                                color = TextPrimary,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-
-                            DailyOverviewCard(displayPoints)
+                                DailyOverviewCard(displayPoints)
+                            }
                         }
                     }
-                }
 
-                is NetworkResponse.Error -> {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(20.dp), contentAlignment = Alignment.Center
-                        ) {
-                            Text(text = state.message, color = Color.Red)
+                    is NetworkResponse.Error -> {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(20.dp), contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = state.message, color = Color.Red)
+                            }
                         }
                     }
-                }
 
-                else -> {}
+                    else -> {}
+                }
             }
         }
     }
@@ -413,10 +442,6 @@ fun ForecastChartCard(points: List<ForecastPointDto>, maxLabel: String, isToday:
                             lineTo(pointsArr.last().x, topPadding + chartHeight)
                             close()
                         }
-                        
-                        // Use clipPath or just scale? Truncating the path is better for "draw-in"
-                        // For simplicity, we can use graphicsLayer or just draw a subset of points
-                        // Actually, using path.draw-in via measure/segment is advanced, let's use a simpler "reveal" with alpha and clipping
                         
                         drawPath(
                             path = fillPath,

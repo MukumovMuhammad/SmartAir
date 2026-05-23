@@ -105,9 +105,19 @@ fun MainScreen(
                 val homeViewModel: HomeViewModel = viewModel(
                     factory = HomeViewModel.Factory(repository)
                 )
-                HomeScreen(homeViewModel){
-                    onLogout()
-                }
+                HomeScreen(
+                    viewModel = homeViewModel,
+                    logout = { onLogout() },
+                    onChatClick = { 
+                        navController.navigate(Screen.AIAssistant.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
             }
             composable(Screen.Map.route) { 
                 val context = LocalContext.current

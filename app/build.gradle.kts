@@ -20,8 +20,15 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Reduces APK size significantly by only including one architecture
+            ndk {
+                abiFilters.add("arm64-v8a")
+            }
+        }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

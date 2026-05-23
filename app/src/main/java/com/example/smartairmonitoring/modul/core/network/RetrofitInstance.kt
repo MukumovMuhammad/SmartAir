@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitInstance {
 
-    private const val BASE_URL = "http://192.168.0.124:8000/"
+    private const val BASE_URL = "https://gemma4-django-105829172718.europe-west3.run.app/"
 
     private val okHttpClient: OkHttpClient by lazy {
         val logging = HttpLoggingInterceptor().apply {

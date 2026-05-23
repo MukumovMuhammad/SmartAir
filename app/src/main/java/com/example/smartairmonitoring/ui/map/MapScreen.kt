@@ -18,6 +18,9 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +55,7 @@ fun MapScreen(viewModel: MapViewModel, onBackClick: () -> Unit) {
     val filters = listOf("AQI", "PM2.5", "PM10", "O3", "NO2")
 
     val mapState by viewModel.mapState.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     val selectedCity by viewModel.selectedCity.collectAsState()
 
     var selectedMapStyle by remember { mutableStateOf("mapbox://styles/mapbox/standard") }
@@ -68,6 +72,8 @@ fun MapScreen(viewModel: MapViewModel, onBackClick: () -> Unit) {
             zoom(6.5)
         }
     }
+
+    val pullToRefreshState = rememberPullToRefreshState()
 
     LaunchedEffect(selectedFilter) {
         viewModel.getMapData(selectedFilter)
@@ -121,194 +127,208 @@ fun MapScreen(viewModel: MapViewModel, onBackClick: () -> Unit) {
         },
         containerColor = BackgroundDeepNavy
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.refresh(selectedFilter) },
+            state = pullToRefreshState,
+            indicator = {
+                PullToRefreshDefaults.Indicator(
+                    state = pullToRefreshState,
+                    isRefreshing = isRefreshing,
+                    containerColor = BackgroundSecondary,
+                    color = AIAccent,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
+            },
+            modifier = Modifier.padding(padding)
         ) {
-            // FILTERS
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(filters) { filter ->
-                    FilterChip(
-                        selected = selectedFilter == filter,
-                        onClick = { selectedFilter = filter },
-                        label = { Text(filter) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = AIAccent,
-                            selectedLabelColor = Color.White,
-                            labelColor = TextSecondary,
-                            containerColor = BackgroundSecondary
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            borderColor = Color.Transparent,
-                            enabled = true,
-                            selected = selectedFilter == filter
-                        )
-                    )
-                }
-            }
-
-            // 🗺️ MAP
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(0.5f) // Map takes 50%
-            ) {
-                MapboxMap(
-                    modifier = Modifier.fillMaxSize(),
-                    mapViewportState = mapViewportState,
-                    style = { MapStyle(selectedMapStyle) }
-                ) {
-                    if (mapState is NetworkResponse.Success) {
-                        val cities = (mapState as NetworkResponse.Success).data.data.cities
-                        val geoJson = createGeoJson(cities, selectedFilter)
-
-                        MapEffect(geoJson, selectedMapStyle) { mapView ->
-                            mapView.mapboxMap.getStyle { style ->
-                                // Remove old source/layer if they exist
-                                style.removeStyleLayer("aqi-heat")
-                                style.removeStyleSource("aqi-source")
-
-                                style.addSource(
-                                    geoJsonSource("aqi-source") {
-                                        data(geoJson)
-                                    }
-                                )
-
-                                style.addLayer(
-                                    heatmapLayer("aqi-heat", "aqi-source") {
-                                        heatmapWeight(
-                                            interpolate {
-                                                linear()
-                                                get("value")
-                                                stop { literal(0.0); literal(0.1) }
-                                                stop {
-                                                    literal(
-                                                        when (selectedFilter) {
-                                                            "AQI" -> 300.0
-                                                            "PM2.5", "PM10" -> 150.0
-                                                            else -> 100.0
-                                                        }
-                                                    )
-                                                    literal(1.0)
-                                                }
-                                            }
-                                        )
-                                        heatmapRadius(
-                                            interpolate {
-                                                linear()
-                                                zoom()
-                                                stop { literal(4.0); literal(15.0) }
-                                                stop { literal(8.0); literal(40.0) }
-                                                stop { literal(12.0); literal(100.0) }
-                                            }
-                                        )
-                                        heatmapIntensity(
-                                            interpolate {
-                                                linear()
-                                                zoom()
-                                                stop { literal(4.0); literal(0.5) }
-                                                stop { literal(12.0); literal(2.0) }
-                                            }
-                                        )
-                                        heatmapOpacity(0.7)
-                                        heatmapColor(
-                                            interpolate {
-                                                linear()
-                                                heatmapDensity()
-                                                stop { literal(0.0); rgba(0.0, 0.0, 0.0, 0.0) }
-                                                stop { literal(0.1); rgb(34.0, 197.0, 94.0) }   // Good (Green)
-                                                stop { literal(0.3); rgb(234.0, 179.0, 8.0) }   // Moderate (Yellow)
-                                                stop { literal(0.5); rgb(249.0, 115.0, 22.0) }  // Sensitive (Orange)
-                                                stop { literal(0.7); rgb(239.0, 68.0, 68.0) }   // Unhealthy (Red)
-                                                stop { literal(0.9); rgb(168.0, 85.0, 247.0) }  // Very Unhealthy (Purple)
-                                                stop { literal(1.0); rgb(126.0, 34.0, 206.0) }  // Hazardous (Deep Purple)
-                                            }
-                                        )
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                FloatingActionButton(
-                    onClick = {
-                        selectedCity?.let {
-                            mapViewportState.flyTo(
-                                CameraOptions.Builder()
-                                    .center(Point.fromLngLat(it.lon, it.lat))
-                                    .zoom(10.0)
-                                    .build()
-                            )
-                        }
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(16.dp),
-                    containerColor = AIAccent,
-                    contentColor = Color.White
-                ) {
-                    Icon(Icons.Default.Navigation, contentDescription = null)
-                }
-            }
-
-            // DETAILS & LEGEND
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(0.5f) // Details take 50%
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier.fillMaxSize()
             ) {
-                LegendCard()
-                
-                when (val state = mapState) {
-                    is NetworkResponse.Loading -> {
-                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = AIAccent)
+                // FILTERS
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(filters) { filter ->
+                        FilterChip(
+                            selected = selectedFilter == filter,
+                            onClick = { selectedFilter = filter },
+                            label = { Text(filter) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AIAccent,
+                                selectedLabelColor = Color.White,
+                                labelColor = TextSecondary,
+                                containerColor = BackgroundSecondary
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                borderColor = Color.Transparent,
+                                enabled = true,
+                                selected = selectedFilter == filter
+                            )
+                        )
+                    }
+                }
+
+                // 🗺️ MAP
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.5f) // Map takes 50%
+                ) {
+                    MapboxMap(
+                        modifier = Modifier.fillMaxSize(),
+                        mapViewportState = mapViewportState,
+                        style = { MapStyle(selectedMapStyle) }
+                    ) {
+                        if (mapState is NetworkResponse.Success) {
+                            val cities = (mapState as NetworkResponse.Success).data.data.cities
+                            val geoJson = createGeoJson(cities, selectedFilter)
+
+                            MapEffect(geoJson, selectedMapStyle) { mapView ->
+                                mapView.mapboxMap.getStyle { style ->
+                                    // Remove old source/layer if they exist
+                                    style.removeStyleLayer("aqi-heat")
+                                    style.removeStyleSource("aqi-source")
+
+                                    style.addSource(
+                                        geoJsonSource("aqi-source") {
+                                            data(geoJson)
+                                        }
+                                    )
+
+                                    style.addLayer(
+                                        heatmapLayer("aqi-heat", "aqi-source") {
+                                            heatmapWeight(
+                                                interpolate {
+                                                    linear()
+                                                    get("value")
+                                                    stop { literal(0.0); literal(0.1) }
+                                                    stop {
+                                                        literal(
+                                                            when (selectedFilter) {
+                                                                "AQI" -> 300.0
+                                                                "PM2.5", "PM10" -> 150.0
+                                                                else -> 100.0
+                                                            }
+                                                        )
+                                                        literal(1.0)
+                                                    }
+                                                }
+                                            )
+                                            heatmapRadius(
+                                                interpolate {
+                                                    linear()
+                                                    zoom()
+                                                    stop { literal(4.0); literal(15.0) }
+                                                    stop { literal(8.0); literal(40.0) }
+                                                    stop { literal(12.0); literal(100.0) }
+                                                }
+                                            )
+                                            heatmapIntensity(
+                                                interpolate {
+                                                    linear()
+                                                    zoom()
+                                                    stop { literal(4.0); literal(0.5) }
+                                                    stop { literal(12.0); literal(2.0) }
+                                                }
+                                            )
+                                            heatmapOpacity(0.7)
+                                            heatmapColor(
+                                                interpolate {
+                                                    linear()
+                                                    heatmapDensity()
+                                                    stop { literal(0.0); rgba(0.0, 0.0, 0.0, 0.0) }
+                                                    stop { literal(0.1); rgb(34.0, 197.0, 94.0) }   // Good (Green)
+                                                    stop { literal(0.3); rgb(234.0, 179.0, 8.0) }   // Moderate (Yellow)
+                                                    stop { literal(0.5); rgb(249.0, 115.0, 22.0) }  // Sensitive (Orange)
+                                                    stop { literal(0.7); rgb(239.0, 68.0, 68.0) }   // Unhealthy (Red)
+                                                    stop { literal(0.9); rgb(168.0, 85.0, 247.0) }  // Very Unhealthy (Purple)
+                                                    stop { literal(1.0); rgb(126.0, 34.0, 206.0) }  // Hazardous (Deep Purple)
+                                                }
+                                            )
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
-                    is NetworkResponse.Success -> {
-                        state.data.data.cities.forEachIndexed { index, city ->
-                            var visible by remember { mutableStateOf(false) }
-                            LaunchedEffect(Unit) {
-                                delay(index * 100L)
-                                visible = true
-                            }
-                            
-                            AnimatedVisibility(
-                                visible = visible,
-                                enter = fadeIn(animationSpec = tween(500)) + slideInVertically(
-                                    animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy)
-                                ) { it / 2 }
-                            ) {
-                                LocationDetailCard(
-                                    city = city,
-                                    isSelected = selectedCity?.city == city.city,
-                                    onClick = { 
-                                        viewModel.selectCity(city)
-                                        mapViewportState.flyTo(
-                                            CameraOptions.Builder()
-                                                .center(Point.fromLngLat(city.lon, city.lat))
-                                                .zoom(10.0)
-                                                .build()
-                                        )
-                                    }
+
+                    FloatingActionButton(
+                        onClick = {
+                            selectedCity?.let {
+                                mapViewportState.flyTo(
+                                    CameraOptions.Builder()
+                                        .center(Point.fromLngLat(it.lon, it.lat))
+                                        .zoom(10.0)
+                                        .build()
                                 )
                             }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(16.dp),
+                        containerColor = AIAccent,
+                        contentColor = Color.White
+                    ) {
+                        Icon(Icons.Default.Navigation, contentDescription = null)
+                    }
+                }
+
+                // DETAILS & LEGEND
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.5f) // Details take 50%
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    LegendCard()
+                    
+                    when (val state = mapState) {
+                        is NetworkResponse.Loading -> {
+                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = AIAccent)
+                            }
                         }
+                        is NetworkResponse.Success -> {
+                            state.data.data.cities.forEachIndexed { index, city ->
+                                var visible by remember { mutableStateOf(false) }
+                                LaunchedEffect(Unit) {
+                                    delay(index * 100L)
+                                    visible = true
+                                }
+                                
+                                AnimatedVisibility(
+                                    visible = visible,
+                                    enter = fadeIn(animationSpec = tween(500)) + slideInVertically(
+                                        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy)
+                                    ) { it / 2 }
+                                ) {
+                                    LocationDetailCard(
+                                        city = city,
+                                        isSelected = selectedCity?.city == city.city,
+                                        onClick = { 
+                                            viewModel.selectCity(city)
+                                            mapViewportState.flyTo(
+                                                CameraOptions.Builder()
+                                                    .center(Point.fromLngLat(city.lon, city.lat))
+                                                    .zoom(10.0)
+                                                    .build()
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        is NetworkResponse.Error -> {
+                            Text(state.message, color = Color.Red)
+                        }
+                        else -> {}
                     }
-                    is NetworkResponse.Error -> {
-                        Text(state.message, color = Color.Red)
-                    }
-                    else -> {}
                 }
             }
         }

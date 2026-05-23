@@ -16,6 +16,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,20 +45,24 @@ import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
+fun HomeScreen(viewModel: HomeViewModel, onChatClick: () -> Unit, logout: () -> Unit) {
     val homeState by viewModel.homeState.collectAsState()
     val aiAdviceState by viewModel.aiAdviceState.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     var showLocationDialog by remember { mutableStateOf(false) }
     var infoDialogContent by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     val aqiValue = ((homeState as? NetworkResponse.Success)?.data?.data?.aqi) ?: 0
 
-    val (backgroundImage, _, status) = when {
-        aqiValue <= 50 -> Triple(R.drawable.img_good_air, Color(0xFF22C55E), "Good")
-        aqiValue <= 100 -> Triple(R.drawable.img_mid_air, Color(0xFFEAB308), "Moderate")
-        aqiValue <= 150 -> Triple(R.drawable.img_air_pulluted, Color(0xFFF97316), "Unhealthy")
-        else -> Triple(R.drawable.img_air_pulluted, Color(0xFFEF4444), "Unhealthy")
+    val (backgroundImage, _, status, healthAdvice) = when {
+        aqiValue <= 50 -> Quadruple(R.drawable.img_good_air, Color(0xFF22C55E), "Good", "Air is healthy for everyone")
+        aqiValue <= 100 -> Quadruple(R.drawable.img_mid_air, Color(0xFFEAB308), "Moderate", "Sensitive groups should limit exertion")
+        aqiValue <= 150 -> Quadruple(R.drawable.img_air_pulluted, Color(0xFFF97316), "Unhealthy", "Limit outdoor activities if sensitive")
+        aqiValue <= 200 -> Quadruple(R.drawable.img_air_pulluted, Color(0xFFEF4444), "Unhealthy", "Everyone should limit outdoor time")
+        aqiValue <= 300 -> Quadruple(R.drawable.img_air_pulluted, Color(0xFFEF4444), "Very Unhealthy", "Health alert: serious effects possible")
+        else -> Quadruple(R.drawable.img_air_pulluted, Color(0xFFEF4444), "Hazardous", "Emergency conditions: avoid outdoors")
     }
 
     val towns = listOf("Dushanbe", "Khujand", "Bokhtar", "Kulob", "Istaravshan", "Panjakent", "Khorugh", "Tursunzoda", "Hisor")
@@ -65,6 +72,8 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
         viewModel.getCityAirData(location)
         viewModel.getAIAdvice(location)
     }
+
+    val pullToRefreshState = rememberPullToRefreshState()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
@@ -80,146 +89,166 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
                 .background(BackgroundDeepNavy.copy(alpha = 0.75f))
         )
 
-        Scaffold(
-            topBar = { 
-                HomeTopBar(
-                    location = location,
-                    onLocationClick = { showLocationDialog = true }
-                ) 
-            },
-            containerColor = Color.Transparent
-        ) { padding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                when (val state = homeState) {
-                    is NetworkResponse.Loading -> {
-                        // We could keep HomeShimmer for everything except AIAdvice,
-                        // but the user wants AI advice to shimmer separately.
-                        // For now, let's keep the main shimmer.
-                        HomeShimmer()
-                    }
-                    is NetworkResponse.Success -> {
-                        val data = state.data.data
-                        
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "Air Quality",
-                                color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = formatDt(data.dt),
-                                color = Color.White.copy(alpha = 0.5f),
-                                fontSize = 12.sp
-                            )
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.refresh(location) },
+            state = pullToRefreshState,
+            indicator = {
+                PullToRefreshDefaults.Indicator(
+                    state = pullToRefreshState,
+                    isRefreshing = isRefreshing,
+                    containerColor = BackgroundSecondary,
+                    color = AIAccent,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
+            }
+        ) {
+            Scaffold(
+                topBar = { 
+                    HomeTopBar(
+                        location = location,
+                        onLocationClick = { showLocationDialog = true }
+                    ) 
+                },
+                containerColor = Color.Transparent
+            ) { padding ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    when (val state = homeState) {
+                        is NetworkResponse.Loading -> {
+                            HomeShimmer()
                         }
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Large Status Text (Matching picture)
-                        Text(
-                            text = status,
-                            color = getAQIColor(aqiValue),
-                            fontSize = 42.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        
-                        Text(
-                            text = "for Sensitive Groups",
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 16.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(28.dp))
-                        
-                        AQIGauge(aqi = aqiValue)
-                        
-                        Spacer(modifier = Modifier.height(40.dp))
-                        
-                        // SEPARATE AI ADVICE SECTION (Powered by Gemma 4)
-                        when (val aiState = aiAdviceState) {
-                            is NetworkResponse.Loading -> {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(100.dp)
-                                        .clip(RoundedCornerShape(20.dp))
-                                        .shimmerEffect()
+                        is NetworkResponse.Success -> {
+                            val data = state.data.data
+                            
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "Air Quality",
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = formatDt(data.dt),
+                                    color = Color.White.copy(alpha = 0.5f),
+                                    fontSize = 12.sp
                                 )
                             }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Large Status Text
+                            Text(
+                                text = status,
+                                color = getAQIColor(aqiValue),
+                                fontSize = 42.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            
+                            Text(
+                                text = healthAdvice,
+                                color = Color.White.copy(alpha = 0.6f),
+                                fontSize = 16.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(28.dp))
+                            
+                            AQIGauge(aqi = aqiValue)
+                            
+                            Spacer(modifier = Modifier.height(40.dp))
+                            
+                            // SEPARATE AI ADVICE SECTION (Airi's Recommendation)
+                            when (val aiState = aiAdviceState) {
+                                is NetworkResponse.Loading -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(100.dp)
+                                            .clip(RoundedCornerShape(20.dp))
+                                            .shimmerEffect()
+                                    )
+                                }
                             is NetworkResponse.Success -> {
-                                AIAdviceCard(advice = aiState.data.advice)
+                                AIAdviceCard(
+                                    advice = aiState.data.advice,
+                                    onChatClick = onChatClick
+                                )
                             }
-                            is NetworkResponse.Error -> {
-                                Text(text = "Could not fetch AI advice", color = Color.Red, fontSize = 12.sp)
+                                is NetworkResponse.Error -> {
+                                    Text(text = "Airi is currently unavailable", color = Color.Red.copy(alpha = 0.7f), fontSize = 12.sp)
+                                }
+                                else -> {}
                             }
-                            else -> {}
-                        }
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(24.dp))
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            InfoCard(
-                                label = "PM2.5",
-                                value = "${data.pm25}",
-                                unit = "µg/m³",
-                                modifier = Modifier.weight(1f),
-                                icon = Icons.Default.Air,
-                                onInfoClick = {
-                                    infoDialogContent = "PM2.5" to "Fine particulate matter (PM2.5) are tiny particles in the air that reduce visibility and cause the air to appear hazy when levels are elevated. They are small enough to get deep into the lungs and even into the bloodstream."
-                                }
-                            )
-                            InfoCard(
-                                label = "PM10",
-                                value = "${data.pm10}",
-                                unit = "µg/m³",
-                                modifier = Modifier.weight(1f),
-                                icon = Icons.Default.Cloud,
-                                onInfoClick = {
-                                    infoDialogContent = "PM10" to "Particulate matter 10 micrometers or less in diameter. These particles are inhalable into the lungs and can induce adverse health effects. Sources include crushing/grinding operations and dust stirred up by vehicles."
-                                }
-                            )
-                            InfoCard(
-                                label = "O3",
-                                value = "${data.o3.toInt()}",
-                                unit = "ppb",
-                                modifier = Modifier.weight(1f),
-                                icon = Icons.Default.FilterDrama,
-                                onInfoClick = {
-                                    infoDialogContent = "O3 (Ozone)" to "Ground-level ozone is not emitted directly into the air, but is created by chemical reactions between oxides of nitrogen (NOx) and volatile organic compounds (VOC) in the presence of sunlight."
-                                }
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(24.dp))
-                        
-                        MainPollutantCard(
-                            name = "PM2.5",
-                            value = data.pm25.toInt(),
-                            maxValue = 100,
-                            onInfoClick = {
-                                infoDialogContent = "Main Pollutant" to "This is the pollutant currently contributing most to the Air Quality Index (AQI) calculation. Protecting yourself from this specific pollutant is the highest priority."
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                InfoCard(
+                                    label = "PM2.5",
+                                    value = "${data.pm25}",
+                                    unit = "µg/m³",
+                                    modifier = Modifier.weight(1f),
+                                    icon = Icons.Default.Air,
+                                    onInfoClick = {
+                                        infoDialogContent = "PM2.5" to "Fine particulate matter (PM2.5) are tiny particles in the air that reduce visibility and cause the air to appear hazy when levels are elevated."
+                                    }
+                                )
+                                InfoCard(
+                                    label = "PM10",
+                                    value = "${data.pm10}",
+                                    unit = "µg/m³",
+                                    modifier = Modifier.weight(1f),
+                                    icon = Icons.Default.Cloud,
+                                    onInfoClick = {
+                                        infoDialogContent = "PM10" to "Particulate matter 10 micrometers or less in diameter. These particles are inhalable into the lungs and can induce adverse health effects."
+                                    }
+                                )
+                                InfoCard(
+                                    label = "O3",
+                                    value = "${data.o3.toInt()}",
+                                    unit = "ppb",
+                                    modifier = Modifier.weight(1f),
+                                    icon = Icons.Default.FilterDrama,
+                                    onInfoClick = {
+                                        infoDialogContent = "O3 (Ozone)" to "Ground-level ozone is created by chemical reactions between oxides of nitrogen (NOx) and volatile organic compounds (VOC)."
+                                    }
+                                )
                             }
-                        )
-                        
-                        Spacer(modifier = Modifier.height(100.dp))
-                    }
-                    is NetworkResponse.Error -> {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(text = state.message, color = Color.White)
+                            
+                            Spacer(modifier = Modifier.height(24.dp))
+                            
+                            MainPollutantCard(
+                                name = "PM2.5",
+                                value = data.pm25.toInt(),
+                                maxValue = 100,
+                                onInfoClick = {
+                                    infoDialogContent = "Main Pollutant" to "This is the pollutant currently contributing most to the Air Quality Index (AQI) calculation."
+                                }
+                            )
+                            
+                            Spacer(modifier = Modifier.height(100.dp))
                         }
+                        is NetworkResponse.Error -> {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(text = state.message, color = Color.White)
+                                    Button(onClick = { viewModel.refresh(location) }) {
+                                        Text("Retry")
+                                    }
+                                }
+                            }
+                        }
+                        else -> {}
                     }
-                    else -> {}
                 }
             }
         }
@@ -275,14 +304,29 @@ fun HomeScreen(viewModel: HomeViewModel, logout: () -> Unit) {
 
 private fun formatDt(dt: String): String {
     return try {
+        // Assume server time is in UTC or a base time, adding 5 hours for Tajikistan
         val inputSdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-        val outputSdf = SimpleDateFormat("HH:mm", Locale.getDefault())
         val date = inputSdf.parse(dt)
-        if (date != null) "Last update: ${outputSdf.format(date)}" else "Last update: $dt"
+        if (date != null) {
+            val cal = java.util.Calendar.getInstance()
+            cal.time = date
+            cal.add(java.util.Calendar.HOUR_OF_DAY, 5) // Tajikistan (UTC+5)
+            val outputSdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+            "Last update: ${outputSdf.format(cal.time)}"
+        } else {
+            "Last update: $dt"
+        }
     } catch (e: Exception) {
         "Last update: $dt"
     }
 }
+
+data class Quadruple<out A, out B, out C, out D>(
+    val first: A,
+    val second: B,
+    val third: C,
+    val fourth: D
+)
 
 @Composable
 fun HomeTopBar(location: String, onLocationClick: () -> Unit) {
@@ -518,7 +562,7 @@ fun InfoCard(
 }
 
 @Composable
-fun AIAdviceCard(advice: String) {
+fun AIAdviceCard(advice: String, onChatClick: () -> Unit) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(advice) { 
         visible = false
@@ -530,46 +574,45 @@ fun AIAdviceCard(advice: String) {
         visible = visible,
         enter = fadeIn(animationSpec = tween(1000, delayMillis = 200)) + slideInHorizontally(initialOffsetX = { 100 })
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
                 .background(BackgroundSecondary.copy(alpha = 0.7f))
-                .border(1.dp, AIAccent.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
-                .padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .border(1.dp, AIAccent.copy(alpha = 0.2f), RoundedCornerShape(20.dp))
+                .clickable { onChatClick() }
+                .padding(18.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(50.dp)
-                    .clip(CircleShape)
-                    .background(BackgroundElevated),
-                contentAlignment = Alignment.Center
+            Row(
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.img_ai_robot),
-                    contentDescription = null,
-                    modifier = Modifier.size(40.dp),
-                    contentScale = ContentScale.Fit
-                )
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(BackgroundElevated),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "AI Advice", color = AIAccent, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
-                    Text(text = "Powered by Gemma 4", color = AIAccent.copy(alpha = 0.6f), fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                    Image(
+                        painter = painterResource(id = R.drawable.img_ai_robot),
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        contentScale = ContentScale.Fit
+                    )
                 }
-                Text(
-                    text = advice,
-                    color = TextPrimary,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp
-                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(text = "AI Advice", color = AIAccent, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                    Text(text = "Powered by Gemma 4", color = AIAccent.copy(alpha = 0.5f), fontSize = 10.sp)
+                }
             }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = advice,
+                color = TextPrimary,
+                fontSize = 13.sp,
+                lineHeight = 18.sp
+            )
         }
     }
 }

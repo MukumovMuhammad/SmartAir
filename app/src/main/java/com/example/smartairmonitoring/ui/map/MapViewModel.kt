@@ -23,13 +23,31 @@ class MapViewModel(
     private val _mapState = MutableStateFlow<NetworkResponse<MapResponse>>(NetworkResponse.Idle)
     val mapState = _mapState.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing = _isRefreshing.asStateFlow()
+
     private val _selectedCity = MutableStateFlow<MapCityDto?>(null)
     val selectedCity = _selectedCity.asStateFlow()
 
     private var mapJob: Job? = null
 
+    fun refresh(pollutant: String) {
+        Log.d(TAG, "refresh: Manual refresh triggered for map data ($pollutant)")
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            _mapState.value = NetworkResponse.Loading
+            Log.d(TAG, "refresh: Fetching fresh map data from network")
+            val result = repo.getMapData(pollutant)
+            Log.d(TAG, "refresh: Map data fetch completed with result: ${result.javaClass.simpleName}")
+            if (result is NetworkResponse.Success) {
+                updateSelectedCityFromData(result.data.data.cities)
+            }
+            _isRefreshing.value = false
+        }
+    }
+
     fun getMapData(pollutant: String) {
-        Log.i(TAG, "Fetching map data for pollutant: $pollutant")
+        Log.i(TAG, "getMapData: Initiating for pollutant: $pollutant")
         
         mapJob?.cancel()
         _mapState.value = NetworkResponse.Loading
@@ -37,9 +55,10 @@ class MapViewModel(
         mapJob = viewModelScope.launch {
             // Observe local database
             launch {
+                Log.d(TAG, "getMapData: Starting local DB observation for $pollutant")
                 repo.getLocalMapData(pollutant).collect { cached ->
                     if (cached != null) {
-                        Log.d(TAG, "Displaying cached map data for $pollutant")
+                        Log.i(TAG, "getMapData: Found cached map data in Room for $pollutant")
                         val response = MapResponse(
                             status = "success",
                             data = MapDataDto(
@@ -49,17 +68,26 @@ class MapViewModel(
                         )
                         _mapState.value = NetworkResponse.Success(response)
                         updateSelectedCityFromData(cached.cities)
+                    } else {
+                        Log.w(TAG, "getMapData: No cached map data found for $pollutant")
                     }
                 }
             }
 
             // Fetch from network
+            Log.d(TAG, "getMapData: Requesting fresh data from Remote API for $pollutant")
             val result = repo.getMapData(pollutant)
             if (result is NetworkResponse.Success) {
+                Log.i(TAG, "getMapData: Successfully synced Remote data to Local for $pollutant")
                 updateSelectedCityFromData(result.data.data.cities)
-            } else if (result is NetworkResponse.Error && _mapState.value !is NetworkResponse.Success) {
-                Log.e(TAG, "Error fetching map data: ${result.message}")
-                _mapState.value = result
+            } else if (result is NetworkResponse.Error) {
+                Log.e(TAG, "getMapData: Remote fetch FAILED for $pollutant. Error: ${result.message}")
+                if (_mapState.value !is NetworkResponse.Success) {
+                    Log.d(TAG, "getMapData: No cache available, propagating error to UI")
+                    _mapState.value = result
+                } else {
+                    Log.d(TAG, "getMapData: Using stale cache due to network error")
+                }
             }
         }
     }
@@ -77,7 +105,7 @@ class MapViewModel(
     }
 
     fun selectCity(city: MapCityDto) {
-        Log.i(TAG, "City selected: ${city.city}")
+        Log.i(TAG, "selectCity: City selected: ${city.city}")
         _selectedCity.value = city
     }
 
