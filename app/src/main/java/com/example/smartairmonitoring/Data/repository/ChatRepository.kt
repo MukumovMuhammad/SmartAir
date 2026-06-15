@@ -29,10 +29,11 @@ class ChatRepository(private val api: ChatApiService) {
     }
 
     suspend fun createSession(userUid: String, title: String? = null): NetworkResponse<ChatSessionDto> = withContext(Dispatchers.IO) {
+        Log.i(tag, "Creating the new session with userUid: $userUid and title: $title ")
         try {
             val request = ChatSessionRequest(userUid, title)
             val response = api.createSession(request)
-            Log.d(tag, "Created session: ${response.data.id}")
+            Log.d(tag, "Created session: ${response.data.chat_id}")
             NetworkResponse.Success(response.data)
         } catch (e: Exception) {
             if (e is CancellationException) throw e
@@ -42,6 +43,7 @@ class ChatRepository(private val api: ChatApiService) {
     }
 
     suspend fun getUserSessions(userUid: String): NetworkResponse<List<ChatSessionDto>> = withContext(Dispatchers.IO) {
+        Log.d(tag, "Fetching session list")
         try {
             val response = api.getUserSessions(userUid)
             Log.d(tag, "Fetched ${response.data.size} sessions for user: $userUid")
@@ -53,10 +55,11 @@ class ChatRepository(private val api: ChatApiService) {
         }
     }
 
-    suspend fun getSessionMessages(sessionId: String): NetworkResponse<List<ChatMessageDto>> = withContext(Dispatchers.IO) {
+    suspend fun getSessionMessages(chat_id: String): NetworkResponse<List<ChatMessageDto>> = withContext(Dispatchers.IO) {
+        Log.d(tag, "Fetching messages from session $chat_id")
         try {
-            val response = api.getSessionMessages(sessionId)
-            Log.d(tag, "Fetched ${response.data.size} messages for session: $sessionId")
+            val response = api.getSessionMessages(chat_id)
+            Log.d(tag, "Fetched ${response.data.size} messages for session: $chat_id")
             NetworkResponse.Success(response.data)
         } catch (e: Exception) {
             if (e is CancellationException) throw e
@@ -65,10 +68,11 @@ class ChatRepository(private val api: ChatApiService) {
         }
     }
 
-    suspend fun sendMessage(sessionId: String, message: String): NetworkResponse<SendMessageDataDto> = withContext(Dispatchers.IO) {
+    suspend fun sendMessage(chat_id: String, message: String): NetworkResponse<SendMessageDataDto> = withContext(Dispatchers.IO) {
+        Log.d(tag, "SendMessage: Sending message $message")
         try {
-            val response = api.sendMessage(sessionId, SendMessageRequest(message))
-            Log.d(tag, "Message sent to session: $sessionId")
+            val response = api.sendMessage(chat_id, SendMessageRequest(message))
+            Log.d(tag, "Message sent to session: $chat_id")
             NetworkResponse.Success(response.data)
         } catch (e: Exception) {
             if (e is CancellationException) throw e
@@ -77,10 +81,10 @@ class ChatRepository(private val api: ChatApiService) {
         }
     }
 
-    suspend fun deleteSession(sessionId: String): NetworkResponse<String> = withContext(Dispatchers.IO) {
+    suspend fun deleteSession(chat_id: String): NetworkResponse<String> = withContext(Dispatchers.IO) {
         try {
-            val response = api.deleteSession(sessionId)
-            Log.d(tag, "Deleted session: $sessionId")
+            val response = api.deleteSession(chat_id)
+            Log.d(tag, "Deleted session: $chat_id")
             NetworkResponse.Success(response.message)
         } catch (e: Exception) {
             if (e is CancellationException) throw e
@@ -89,10 +93,10 @@ class ChatRepository(private val api: ChatApiService) {
         }
     }
 
-    suspend fun updateSessionTitle(sessionId: String, title: String): NetworkResponse<ChatSessionDto> = withContext(Dispatchers.IO) {
+    suspend fun updateSessionTitle(chat_id: String, title: String): NetworkResponse<ChatSessionDto> = withContext(Dispatchers.IO) {
         try {
-            val response = api.updateSessionTitle(sessionId, UpdateTitleRequest(title))
-            Log.d(tag, "Updated title for session: $sessionId")
+            val response = api.updateSessionTitle(chat_id, UpdateTitleRequest(title))
+            Log.d(tag, "Updated title for session: $chat_id")
             NetworkResponse.Success(response.data)
         } catch (e: Exception) {
             if (e is CancellationException) throw e

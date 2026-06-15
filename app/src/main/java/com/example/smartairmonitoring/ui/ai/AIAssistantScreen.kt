@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -30,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.smartairmonitoring.R
-import com.example.smartairmonitoring.Data.remote.dto.ChatMessageDto
 import com.example.smartairmonitoring.Data.remote.dto.ChatSessionDto
 import com.example.smartairmonitoring.modul.core.network.NetworkResponse
 import com.example.smartairmonitoring.modul.core.network.RetrofitInstance
@@ -74,7 +72,7 @@ fun AIAssistantScreen(onBackClick: () -> Unit) {
             ) {
                 ChatHistoryDrawerContent(
                     sessionsState = sessionsState,
-                    currentSessionId = currentSession?.id,
+                    currentSessionId = currentSession?.chat_id,
                     onSessionSelected = { session ->
                         viewModel.selectSession(session)
                         scope.launch { drawerState.close() }
@@ -226,7 +224,7 @@ fun AIAssistantScreen(onBackClick: () -> Unit) {
             },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.renameSession(showRenameDialog!!.id, newTitle)
+                    viewModel.renameSession(showRenameDialog!!.chat_id, newTitle)
                     showRenameDialog = null
                 }) {
                     Text("Rename", color = AIAccent)
@@ -303,13 +301,13 @@ fun ChatHistoryDrawerContent(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        items(sessions, key = { it.id ?: it.hashCode() }) { session ->
+                        items(sessions, key = { it.chat_id ?: it.hashCode() }) { session ->
                             Box(modifier = Modifier.animateItem()) {
                                 SessionItem(
                                     session = session,
-                                    isSelected = session.id == currentSessionId,
+                                    isSelected = session.chat_id == currentSessionId,
                                     onClick = { onSessionSelected(session) },
-                                    onDelete = { onDeleteSession(session.id) },
+                                    onDelete = { onDeleteSession(session.chat_id) },
                                     onRename = { onRenameSession(session) }
                                 )
                             }

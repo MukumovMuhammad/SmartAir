@@ -18,7 +18,7 @@ data class ChatSessionsListResponse(
 )
 
 data class ChatSessionDto(
-    @SerializedName("chat_id") val id: String?,
+    @SerializedName("chat_id") val chat_id: String?,
     @SerializedName("user_uid") val userUid: String,
     @SerializedName("title") val title: String,
     @SerializedName("created_at") val createdAt: String,

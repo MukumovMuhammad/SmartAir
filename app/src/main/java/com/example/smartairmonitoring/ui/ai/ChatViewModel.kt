@@ -73,7 +73,8 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
         // IMPORTANT: reset UI first
         _messages.value = NetworkResponse.Loading
 
-        val id = getId(session.id)
+        val id = getId(session.chat_id)
+        Log.d(tag, "Selected the Session $id")
         if (id != null) {
             fetchMessages(id)
         }
@@ -103,10 +104,12 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
     // SEND MESSAGE (FIXED + SAFE)
     // ---------------------------------------------------
     fun sendMessage(text: String) {
+
+        Log.d("chat_TAG", "sending message $text")
         if (text.isBlank()) return
 
         val session = _currentSession.value
-        val sessionId = getId(session?.id)
+        val sessionId = getId(session?.chat_id)
 
         viewModelScope.launch {
             _isSending.value = true
@@ -140,8 +143,8 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
                     if (createResult is NetworkResponse.Success) {
                         val newSession = createResult.data
                         _currentSession.value = newSession
-                        targetSessionId = getId(newSession.id)
-
+                        targetSessionId = getId(newSession.chat_id)
+                        Log.d(tag, "so now the session after creating is $targetSessionId")
                         if (targetSessionId == null) {
                             Log.e(tag, "Session created but ID is null: ${newSession}")
                             _messages.value = NetworkResponse.Error("Session created but ID is missing")
@@ -154,8 +157,10 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
                     }
                 }
 
+                Log.i(tag, "The session is $targetSessionId")
                 // 3. SEND MESSAGE
                 if (targetSessionId != null) {
+                    Log.i(tag, "Now the message $text will be send to $targetSessionId")
                     val result = repository.sendMessage(targetSessionId, text)
 
                     if (result is NetworkResponse.Success) {
@@ -163,10 +168,10 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
 
                         // IMPORTANT: Save session ID from response if it was missing or different
                         val responseSessionId = newData.userMessage.chatId
-                        if (responseSessionId != null && (_currentSession.value?.id == null || _currentSession.value?.id != responseSessionId)) {
+                        if (responseSessionId != null && (_currentSession.value?.chat_id == null || _currentSession.value?.chat_id != responseSessionId)) {
                              _currentSession.update { current ->
-                                 current?.copy(id = responseSessionId) ?: ChatSessionDto(
-                                     id = responseSessionId,
+                                 current?.copy(chat_id = responseSessionId) ?: ChatSessionDto(
+                                     chat_id = responseSessionId,
                                      userUid = auth.currentUser?.uid ?: "anonymous",
                                      title = newData.sessionTitle,
                                      createdAt = "",
@@ -213,12 +218,12 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
         // 1. Optimistic UI update
         val previousSessions = _sessions.value
         if (previousSessions is NetworkResponse.Success) {
-            val newList = previousSessions.data.filter { it.id != sessionId }
+            val newList = previousSessions.data.filter { it.chat_id != sessionId }
             _sessions.value = NetworkResponse.Success(newList)
         }
 
         // 2. Clear messages if it's the current session
-        if (_currentSession.value?.id == sessionId) {
+        if (_currentSession.value?.chat_id == sessionId) {
             _currentSession.value = null
             _messages.value = NetworkResponse.Idle
         }
@@ -250,7 +255,7 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
 
             if (result is NetworkResponse.Success) {
                 // If it's the current session, update the local state
-                if (_currentSession.value?.id == sessionId) {
+                if (_currentSession.value?.chat_id == sessionId) {
                     _currentSession.value = result.data
                 }
                 fetchSessions()
