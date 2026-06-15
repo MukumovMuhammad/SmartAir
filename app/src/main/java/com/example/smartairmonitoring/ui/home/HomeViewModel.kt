@@ -34,6 +34,8 @@ class HomeViewModel(
     private var aiAdviceJob: Job? = null
 
     fun refresh(city: String) {
+        homeJob?.cancel()
+        aiAdviceJob?.cancel()
         Log.d(TAG, "Manual refresh triggered for city: $city")
         viewModelScope.launch {
             _isRefreshing.value = true
@@ -69,6 +71,7 @@ class HomeViewModel(
         homeJob = viewModelScope.launch {
             // Reactive Pattern: Observe local database
             launch {
+
                 Log.d(TAG, "getCityAirData: Starting local DB observation for $city")
                 repo.getLocalPollution(city).collect { cached ->
                     if (cached != null) {

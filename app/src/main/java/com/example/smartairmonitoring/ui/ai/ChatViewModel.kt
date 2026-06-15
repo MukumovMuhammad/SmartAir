@@ -208,16 +208,32 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
     // ---------------------------------------------------
     fun deleteSession(sessionId: String?) {
         val id = getId(sessionId) ?: return
+        Log.d(tag, "Attempting to delete session. Full ID: $sessionId, extracted ID: $id")
+
+        // 1. Optimistic UI update
+        val previousSessions = _sessions.value
+        if (previousSessions is NetworkResponse.Success) {
+            val newList = previousSessions.data.filter { it.id != sessionId }
+            _sessions.value = NetworkResponse.Success(newList)
+        }
+
+        // 2. Clear messages if it's the current session
+        if (_currentSession.value?.id == sessionId) {
+            _currentSession.value = null
+            _messages.value = NetworkResponse.Idle
+        }
 
         viewModelScope.launch {
             val result = repository.deleteSession(id)
+            Log.d(tag, "Delete session result: $result")
 
-            if (result is NetworkResponse.Success) {
-                if (_currentSession.value?.id == sessionId) {
-                    _currentSession.value = null
-                    _messages.value = NetworkResponse.Idle
-                }
-                fetchSessions()
+            if (result is NetworkResponse.Error) {
+                Log.e(tag, "Failed to delete session on backend: ${result.message}")
+                // Optional: rollback if needed, but usually users prefer it stays gone
+                // _sessions.value = previousSessions 
+            } else {
+                Log.i(tag, "Session $id deleted successfully from backend")
+                fetchSessions() // Refresh to ensure sync
             }
         }
     }

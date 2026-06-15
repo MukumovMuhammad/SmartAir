@@ -118,9 +118,6 @@ fun AIAssistantScreen(onBackClick: () -> Unit) {
                     },
                     navigationIcon = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = onBackClick) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
-                            }
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
                                 Icon(Icons.Default.Menu, contentDescription = "History", tint = TextPrimary)
                             }
@@ -154,7 +151,7 @@ fun AIAssistantScreen(onBackClick: () -> Unit) {
                     is NetworkResponse.Success -> {
                         val messages = state.data
                         if (messages.isEmpty() && !isSending) {
-                            AiriHeader(onSuggestionClick = { viewModel.sendMessage(it) })
+                            WelcomeChatContent(onSuggestionClick = { viewModel.sendMessage(it) })
                         } else {
                             LazyColumn(
 
@@ -202,7 +199,7 @@ fun AIAssistantScreen(onBackClick: () -> Unit) {
                                 item { AITypingIndicator() }
                             }
                         } else {
-                            AiriHeader(onSuggestionClick = { viewModel.sendMessage(it) })
+                            WelcomeChatContent(onSuggestionClick = { viewModel.sendMessage(it) })
                         }
                     }
                 }
@@ -302,15 +299,20 @@ fun ChatHistoryDrawerContent(
                         textAlign = TextAlign.Center
                     )
                 } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(sessions) { session ->
-                            SessionItem(
-                                session = session,
-                                isSelected = session.id == currentSessionId,
-                                onClick = { onSessionSelected(session) },
-                                onDelete = { onDeleteSession(session.id) },
-                                onRename = { onRenameSession(session) }
-                            )
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(sessions, key = { it.id ?: it.hashCode() }) { session ->
+                            Box(modifier = Modifier.animateItem()) {
+                                SessionItem(
+                                    session = session,
+                                    isSelected = session.id == currentSessionId,
+                                    onClick = { onSessionSelected(session) },
+                                    onDelete = { onDeleteSession(session.id) },
+                                    onRename = { onRenameSession(session) }
+                                )
+                            }
                         }
                     }
                 }
@@ -460,62 +462,55 @@ private fun formatTime(createdAt: String): String {
     }
 }
 
+
+
 @Composable
-fun AiriHeader(onSuggestionClick: (String) -> Unit) {
+fun WelcomeChatContent(onSuggestionClick: (String) -> Unit) {
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(120.dp)
-                .clip(CircleShape)
-                .background(BackgroundSecondary),
-            contentAlignment = Alignment.Center
+        Surface(
+            color = BackgroundSecondary,
+            shape = CircleShape,
+            modifier = Modifier.size(120.dp)
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.img_ai_robot),
-                contentDescription = "AI Robot",
-                modifier = Modifier.size(100.dp),
-                contentScale = ContentScale.Fit
-            )
-        }
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        Text(
-            "Hello! I'm Airi",
-            color = TextPrimary,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.ExtraBold
-        )
-        
-        Text(
-            "Your Personal Air Quality Guru",
-            color = AIAccent,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold
-        )
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        Card(
-            modifier = Modifier.padding(horizontal = 32.dp),
-            colors = CardDefaults.cardColors(containerColor = BackgroundSecondary.copy(alpha = 0.5f)),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                SuggestionItem("What is the AQI in Dushanbe right now?") { onSuggestionClick(it) }
-                HorizontalDivider(color = BackgroundElevated, modifier = Modifier.padding(vertical = 8.dp))
-                SuggestionItem("How can I protect myself from PM2.5?") { onSuggestionClick(it) }
-                HorizontalDivider(color = BackgroundElevated, modifier = Modifier.padding(vertical = 8.dp))
-                SuggestionItem("Tell me about health risks of poor air.") { onSuggestionClick(it) }
+            Box(contentAlignment = Alignment.Center) {
+                Image(
+                    painter = painterResource(id = R.drawable.img_ai_robot),
+                    contentDescription = "AI Robot",
+                    modifier = Modifier.size(90.dp),
+                    contentScale = ContentScale.Fit
+                )
             }
         }
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        Text(
+            text = "Start a Conversation",
+            color = TextPrimary,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Text(
+            text = "Ask Airi anything about air quality, health tips, or environmental data.",
+            color = TextSecondary,
+            fontSize = 15.sp,
+            textAlign = TextAlign.Center,
+            lineHeight = 22.sp,
+            modifier = Modifier.padding(horizontal = 32.dp)
+        )
     }
 }
+
 
 @Composable
 fun SuggestionItem(text: String, onClick: (String) -> Unit) {
