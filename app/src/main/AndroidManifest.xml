@@ -3,10 +3,9 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
-
-
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <queries>
         <package android:name="com.google.android.gms" />
@@ -22,10 +21,15 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@drawable/img_logo_launch"
         android:label="@string/app_name"
-        android:roundIcon="@drawable/img_logo_launch"
         android:networkSecurityConfig="@xml/network_security_config"
+        android:roundIcon="@drawable/img_logo_launch"
         android:supportsRtl="true"
         android:theme="@style/Theme.SmartAirMonitoring">
+        <service
+            android:name=".service.NotificationController"
+            android:enabled="true"
+            android:exported="true"></service>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -37,6 +41,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".service.MyFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>
