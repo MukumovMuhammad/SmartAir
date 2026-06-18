@@ -25,5 +25,15 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             Log.d("FCM", "Message Notification Body: ${it.body}")
             // You can implement local notification display here
         }
+
+        // Extract the notification text from the cloud message
+        val title = remoteMessage.notification?.title ?: "Smart Air Alert"
+        val body = remoteMessage.notification?.body ?: "New air quality update available."
+
+        // Initialize our clean controller using the service context
+        val notificationController = NotificationController(applicationContext)
+
+        // Show the banner immediately
+        notificationController.triggerFirebaseNotification(title, body)
     }
 }
