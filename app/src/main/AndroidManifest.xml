@@ -11,9 +11,10 @@
         <package android:name="com.google.android.gms" />
     </queries>
 
+
     <meta-data
         android:name="com.mapbox.token"
-        android:value="YOUR_MAPBOX_ACCESS_TOKEN" />
+        android:value="@string/mapbox_access_token" />
 
     <application
         android:allowBackup="true"
