@@ -1,7 +1,10 @@
 package com.example.smartairmonitoring.modul.core.network
 
+import android.util.Log
 import com.example.smartairmonitoring.Data.remote.AirPollApiService
 import com.example.smartairmonitoring.Data.remote.ChatApiService
+import com.google.android.gms.tasks.Tasks
+import com.google.firebase.auth.FirebaseAuth
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -23,6 +26,20 @@ object RetrofitInstance {
                 val requestBuilder = request.newBuilder()
                     .addHeader("User-Agent", "SmartAirMonitoring-Android")
                     .addHeader("Accept", "application/json")
+
+                val currentUser = FirebaseAuth.getInstance().currentUser
+                if (currentUser != null) {
+                    try {
+                        val tokenTask = currentUser.getIdToken(false)
+                        val tokenResult = Tasks.await(tokenTask, 10, TimeUnit.SECONDS)
+                        val token = tokenResult.token
+                        if (!token.isNullOrEmpty()) {
+                            requestBuilder.addHeader("Authorization", "Bearer $token")
+                        }
+                    } catch (e: Exception) {
+                        Log.e("RetrofitInstance", "Failed to fetch Firebase ID token", e)
+                    }
+                }
 
                 chain.proceed(requestBuilder.build())
             }

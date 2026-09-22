@@ -56,7 +56,10 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
     // LOAD SESSIONS
     // ---------------------------------------------------
     fun fetchSessions() {
-        val userUid = auth.currentUser?.uid ?: return
+        val userUid = auth.currentUser?.uid ?: run {
+            _sessions.value = NetworkResponse.Success(emptyList())
+            return
+        }
 
         viewModelScope.launch {
             _sessions.value = NetworkResponse.Loading
