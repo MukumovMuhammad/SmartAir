@@ -12,5 +12,6 @@ data class User(
     val profilePicUrl: String? = null,
     val notificationsEnabled: Boolean = true,
     val dailyForecastEnabled: Boolean = true,
-    val healthTipsEnabled: Boolean = false
+    val healthTipsEnabled: Boolean = false,
+    val fcmToken: String = ""
 )

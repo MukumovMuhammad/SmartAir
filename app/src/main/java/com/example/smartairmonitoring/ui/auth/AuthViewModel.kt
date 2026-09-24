@@ -17,6 +17,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -60,11 +61,18 @@ class AuthViewModel : ViewModel() {
                 val firebaseUser = result.user
                 
                 if (firebaseUser != null) {
+                    val fcmToken = try {
+                        FirebaseMessaging.getInstance().token.await()
+                    } catch (_: Exception) {
+                        "0"
+                    }
+
                     val user = User(
                         uid = firebaseUser.uid,
                         email = email,
                         firstName = "", // Empty to trigger completion check
-                        surname = ""
+                        surname = "",
+                        fcmToken = fcmToken ?: "0"
                     )
 
                     db.collection("users")
@@ -107,6 +115,10 @@ class AuthViewModel : ViewModel() {
             if (doc.exists()) {
                 Log.d(TAG, "Document exists for user: $uid")
                 val userObj = doc.toObject(User::class.java)
+                
+                // Sync current FCM token if present
+                syncFcmToken(uid)
+
                 if (userObj?.firstName.isNullOrEmpty() || userObj?.surname.isNullOrEmpty()) {
                     Log.d(TAG, "User needs profile completion")
                     _authState.value = AuthState.NeedsProfileCompletion
@@ -116,11 +128,21 @@ class AuthViewModel : ViewModel() {
                 }
             } else {
                 Log.d(TAG, "Document does not exist for user: $uid")
-                // If document doesn't exist for some reason, we need to create it and complete it
                 _authState.value = AuthState.NeedsProfileCompletion
             }
         } catch (e: Exception) {
             _authState.value = AuthState.Error("Failed to check profile status")
+        }
+    }
+
+    private suspend fun syncFcmToken(uid: String) {
+        try {
+            val token = FirebaseMessaging.getInstance().token.await()
+            if (!token.isNullOrEmpty()) {
+                db.collection("users").document(uid).update("fcmToken", token).await()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to sync FCM token", e)
         }
     }
 

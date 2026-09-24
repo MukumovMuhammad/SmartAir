@@ -12,55 +12,79 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.example.smartairmonitoring.modul.core.navigation.AppNavigation
 import com.example.smartairmonitoring.ui.theme.SmartAirMonitoringTheme
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
 
 class MainActivity : ComponentActivity() {
 
-    // Inside MainActivity
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
-        if (isGranted) {
-            // FCM notifications allowed
-        } else {
-            // Inform user that notifications are disabled
-        }
+        handleNotificationPermissionResult(isGranted)
     }
 
     private fun askNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
-                PackageManager.PERMISSION_GRANTED
-            ) {
-                // Permission already granted
+            val isGranted = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (isGranted) {
+                handleNotificationPermissionResult(true)
             } else {
                 requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
+        } else {
+            handleNotificationPermissionResult(true)
         }
     }
 
-    fun getAndStoreFcmToken() {
-        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            if (!task.isSuccessful) {
-                Log.w("FCM", "Fetching FCM registration token failed", task.exception)
-                return@addOnCompleteListener
+    private fun handleNotificationPermissionResult(isGranted: Boolean) {
+        val currentUser = FirebaseAuth.getInstance().currentUser ?: return
+        val db = FirebaseFirestore.getInstance()
+        val userRef = db.collection("users").document(currentUser.uid)
+
+        if (isGranted) {
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val token = task.result ?: "0"
+                    userRef.update(
+                        mapOf(
+                            "fcmToken" to token,
+                            "notificationsEnabled" to true
+                        )
+                    ).addOnSuccessListener {
+                        Log.d("FCM", "FCM token and notifications updated in Firestore")
+                    }
+                }
             }
-
-            // Get new FCM registration token
-            val token = task.result
-
-            Log.d("FCM", "Current token: $token")
-
-            // TODO: Update this token in your Firestore/Backend
-            // Example: updateTokenInFirestore(token)
+        } else {
+            userRef.update(
+                mapOf(
+                    "fcmToken" to "0",
+                    "notificationsEnabled" to false,
+                    "dailyForecastEnabled" to false,
+                    "healthTipsEnabled" to false
+                )
+            ).addOnSuccessListener {
+                Log.d("FCM", "Notifications disabled and token reset to 0 in Firestore")
+            }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        askNotificationPermission()
-        getAndStoreFcmToken()
         enableEdgeToEdge()
+
+        askNotificationPermission()
+
+        FirebaseAuth.getInstance().addAuthStateListener { auth ->
+            if (auth.currentUser != null) {
+                askNotificationPermission()
+            }
+        }
+
         setContent {
             SmartAirMonitoringTheme {
                 AppNavigation()
