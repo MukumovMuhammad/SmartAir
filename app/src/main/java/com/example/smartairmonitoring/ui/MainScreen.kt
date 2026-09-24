@@ -7,8 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,6 +22,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.smartairmonitoring.NotificationIntentData
 import com.example.smartairmonitoring.modul.core.navigation.Screen
 import com.example.smartairmonitoring.ui.ai.AIAssistantScreen
 import com.example.smartairmonitoring.ui.forecast.ForecastScreen
@@ -40,9 +40,13 @@ import com.example.smartairmonitoring.modul.core.network.RetrofitInstance
 
 @Composable
 fun MainScreen(
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    notificationData: NotificationIntentData? = null,
+    onClearNotificationData: () -> Unit = {}
 ) {
     val navController = rememberNavController()
+    var initialChatPrompt by remember { mutableStateOf<String?>(null) }
+    var pendingNotificationAdvice by remember { mutableStateOf<Pair<String, String>?>(null) }
     
     val items = listOf(
         BottomNavItem("Home", Screen.Home.route, Icons.Filled.Home, Icons.Outlined.Home),
@@ -51,6 +55,48 @@ fun MainScreen(
         BottomNavItem("AI", Screen.AIAssistant.route, Icons.Filled.Face, Icons.Outlined.Face),
         BottomNavItem("Profile", Screen.Profile.route, Icons.Filled.Person, Icons.Outlined.Person)
     )
+
+    LaunchedEffect(notificationData) {
+        if (notificationData != null) {
+            when (notificationData.topic) {
+                "daily_forecast" -> {
+                    navController.navigate(Screen.Forecast.route) {
+                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+                "health_tips" -> {
+                    initialChatPrompt = "Hello, give some health tips for today!"
+                    navController.navigate(Screen.AIAssistant.route) {
+                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+                else -> { // "air_quality_alerts" or default -> throw to HomeScreen with detail card
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                    pendingNotificationAdvice = notificationData.title to notificationData.body
+                }
+            }
+            onClearNotificationData()
+        }
+    }
+
+    fun navigateToChatWithPrompt(prompt: String?) {
+        initialChatPrompt = prompt
+        navController.navigate(Screen.AIAssistant.route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -98,31 +144,39 @@ fun MainScreen(
             startDestination = Screen.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Home.route) { 
+            composable(Screen.Home.route) {
                 val context = LocalContext.current
                 val database = SmartAirDatabase.getDatabase(context)
-                val repository = AirPollRepository(RetrofitInstance.airPollApi, database.airPollDao())
+                val repository =
+                    AirPollRepository(RetrofitInstance.airPollApi, database.airPollDao())
                 val homeViewModel: HomeViewModel = viewModel(
                     factory = HomeViewModel.Factory(repository)
                 )
                 HomeScreen(
                     viewModel = homeViewModel,
                     logout = { onLogout() },
-                    onChatClick = { 
-                        navController.navigate(Screen.AIAssistant.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
+                    notificationAdvice = pendingNotificationAdvice,
+                    onClearNotificationAdvice = { pendingNotificationAdvice = null },
+                    onForecastClick = {
+                        navController.navigate(Screen.Forecast.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
                             restoreState = true
                         }
+                    },
+                    onChatClick = { advice ->
+                        val prompt = if (!advice.isNullOrBlank()) {
+                            "Can you explain this air quality health advice in detail and provide practical recommendations: \"$advice\""
+                        } else null
+                        navigateToChatWithPrompt(prompt)
                     }
                 )
             }
-            composable(Screen.Map.route) { 
+            composable(Screen.Map.route) {
                 val context = LocalContext.current
                 val database = SmartAirDatabase.getDatabase(context)
-                val repository = AirPollRepository(RetrofitInstance.airPollApi, database.airPollDao())
+                val repository =
+                    AirPollRepository(RetrofitInstance.airPollApi, database.airPollDao())
                 val mapViewModel: MapViewModel = viewModel(
                     factory = MapViewModel.Factory(repository)
                 )
@@ -131,10 +185,11 @@ fun MainScreen(
                     onBackClick = { navController.popBackStack() }
                 )
             }
-            composable(Screen.Forecast.route) { 
+            composable(Screen.Forecast.route) {
                 val context = LocalContext.current
                 val database = SmartAirDatabase.getDatabase(context)
-                val repository = AirPollRepository(RetrofitInstance.airPollApi, database.airPollDao())
+                val repository =
+                    AirPollRepository(RetrofitInstance.airPollApi, database.airPollDao())
                 val forecastViewModel: ForecastViewModel = viewModel(
                     factory = ForecastViewModel.Factory(repository)
                 )
@@ -143,16 +198,19 @@ fun MainScreen(
                     onBackClick = { navController.popBackStack() }
                 )
             }
-            composable(Screen.AIAssistant.route) { 
-                AIAssistantScreen(onBackClick = { navController.popBackStack() }) 
+            composable(Screen.AIAssistant.route) {
+                AIAssistantScreen(
+                    initialPrompt = initialChatPrompt,
+                    onBackClick = { navController.popBackStack() }
+                )
             }
-            composable(Screen.Profile.route) { 
+            composable(Screen.Profile.route) {
                 val profileViewModel: ProfileViewModel = viewModel()
                 ProfileScreen(
                     viewModel = profileViewModel,
                     onBackClick = { navController.popBackStack() },
                     onLogout = onLogout
-                ) 
+                )
             }
         }
     }

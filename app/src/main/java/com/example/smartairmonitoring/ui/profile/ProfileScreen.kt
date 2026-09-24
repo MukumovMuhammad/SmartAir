@@ -35,6 +35,13 @@ fun ProfileScreen(
     onLogout: () -> Unit
 ) {
     val profileState by viewModel.profileState.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.errorEvents.collect { errorMessage ->
+            Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Scaffold(
         topBar = {

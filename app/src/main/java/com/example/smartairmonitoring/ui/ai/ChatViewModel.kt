@@ -83,12 +83,22 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
         }
     }
 
+    private var handledPrompt: String? = null
+
     // ---------------------------------------------------
     // START NEW CHAT (FIXED)
     // ---------------------------------------------------
     fun startNewChat() {
         _currentSession.value = null
         _messages.value = NetworkResponse.Idle
+        handledPrompt = null
+    }
+
+    fun startChatWithPrompt(prompt: String) {
+        if (prompt.isBlank() || handledPrompt == prompt) return
+        handledPrompt = prompt
+        startNewChat()
+        sendMessage(prompt)
     }
 
     // ---------------------------------------------------

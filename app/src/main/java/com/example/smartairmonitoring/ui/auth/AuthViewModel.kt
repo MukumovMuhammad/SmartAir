@@ -88,6 +88,15 @@ class AuthViewModel : ViewModel() {
                         .set(user)
                         .await()
 
+                    // Subscribe to default topics on sign-up
+                    try {
+                        FirebaseMessaging.getInstance().subscribeToTopic("air_quality_alerts").await()
+                        FirebaseMessaging.getInstance().subscribeToTopic("daily_forecast").await()
+                        FirebaseMessaging.getInstance().unsubscribeFromTopic("health_tips").await()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to subscribe to default topics on sign up", e)
+                    }
+
                     _authState.value = AuthState.NeedsProfileCompletion
                 } else {
                     _authState.value = AuthState.Error("Registration failed: User is null")
@@ -126,6 +135,9 @@ class AuthViewModel : ViewModel() {
                 
                 // Sync current FCM token if present
                 syncFcmToken(uid)
+                if (userObj != null) {
+                    syncTopics(userObj)
+                }
 
                 if (userObj?.firstName.isNullOrEmpty() || userObj?.surname.isNullOrEmpty()) {
                     Log.d(TAG, "User needs profile completion")
@@ -155,6 +167,31 @@ class AuthViewModel : ViewModel() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to sync tokens", e)
+        }
+    }
+
+    private suspend fun syncTopics(user: User) {
+        try {
+            val messaging = FirebaseMessaging.getInstance()
+            if (user.notificationsEnabled) {
+                messaging.subscribeToTopic("air_quality_alerts").await()
+            } else {
+                messaging.unsubscribeFromTopic("air_quality_alerts").await()
+            }
+
+            if (user.dailyForecastEnabled) {
+                messaging.subscribeToTopic("daily_forecast").await()
+            } else {
+                messaging.unsubscribeFromTopic("daily_forecast").await()
+            }
+
+            if (user.healthTipsEnabled) {
+                messaging.subscribeToTopic("health_tips").await()
+            } else {
+                messaging.unsubscribeFromTopic("health_tips").await()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to sync FCM topics", e)
         }
     }
 

@@ -9,17 +9,21 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.smartairmonitoring.NotificationIntentData
 import com.example.smartairmonitoring.ui.MainScreen
 import com.example.smartairmonitoring.ui.auth.*
 import com.google.firebase.auth.FirebaseAuth
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(
+    notificationData: NotificationIntentData? = null,
+    onClearNotificationData: () -> Unit = {}
+) {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = viewModel()
     val authState by authViewModel.authState.collectAsState()
     val TAG = "AppNavigation_TAG"
-    // Check if user is already logged in
+
     val currentUser = FirebaseAuth.getInstance().currentUser
     LaunchedEffect(Unit) {
         Log.d(TAG, "Checking user authentication status")
@@ -30,12 +34,10 @@ fun AppNavigation() {
     }
     val startDestination = if (currentUser != null) Screen.Home.route else Screen.Welcome.route
 
-    // Handle forced navigation for profile completion
     LaunchedEffect(authState) {
         when (authState) {
             is AuthState.NeedsProfileCompletion -> {
                 Log.d(TAG, "Needs profile completion")
-                // Redirect to completion screen if profile is incomplete
                 if (navController.currentDestination?.route != Screen.CompleteProfile.route) {
                     navController.navigate(Screen.CompleteProfile.route) {
                         popUpTo(0) { inclusive = true }
@@ -44,7 +46,6 @@ fun AppNavigation() {
             }
             is AuthState.Success -> {
                 Log.d(TAG, "Auth success")
-                // Navigate to Home upon full success (e.g., after completion or login)
                 val currentRoute = navController.currentDestination?.route
                 if (currentRoute == Screen.SignIn.route || 
                     currentRoute == Screen.SignUp.route || 
@@ -73,20 +74,16 @@ fun AppNavigation() {
             SignInScreen(
                 viewModel = authViewModel,
                 onBackClick = { navController.popBackStack() },
-                onSuccess = { 
-                    // AuthViewModel will trigger NeedsProfileCompletion or Success
-                },
+                onSuccess = { },
                 onSignUpClick = { navController.navigate(Screen.SignUp.route) },
-                onForgotPasswordClick = { /* Handle Forgot Password */ }
+                onForgotPasswordClick = { }
             )
         }
         composable(Screen.SignUp.route) {
             SignUpScreen(
                 viewModel = authViewModel,
                 onBackClick = { navController.popBackStack() },
-                onSuccess = { 
-                    // AuthViewModel will trigger NeedsProfileCompletion
-                },
+                onSuccess = { },
                 onLoginClick = { navController.navigate(Screen.SignIn.route) }
             )
         }
@@ -112,13 +109,16 @@ fun AppNavigation() {
         }
 
         composable(Screen.Home.route) {
-            MainScreen(){
-                // Handle logout
-                authViewModel.logout()
-                navController.navigate(Screen.Welcome.route) {
-                    popUpTo(Screen.Home.route) { inclusive = true }
+            MainScreen(
+                notificationData = notificationData,
+                onClearNotificationData = onClearNotificationData,
+                onLogout = {
+                    authViewModel.logout()
+                    navController.navigate(Screen.Welcome.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
                 }
-            }
+            )
         }
     }
 }

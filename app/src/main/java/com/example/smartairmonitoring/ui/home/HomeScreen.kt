@@ -29,7 +29,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -39,20 +41,38 @@ import androidx.core.view.WindowCompat
 import com.example.smartairmonitoring.R
 import com.example.smartairmonitoring.Data.local.entities.AIAdviceEntity
 import com.example.smartairmonitoring.modul.core.network.NetworkResponse
+import com.example.smartairmonitoring.service.NotificationController
 import com.example.smartairmonitoring.ui.components.shimmerEffect
 import com.example.smartairmonitoring.ui.theme.*
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(viewModel: HomeViewModel, onChatClick: () -> Unit, logout: () -> Unit) {
+fun HomeScreen(
+    viewModel: HomeViewModel,
+    notificationAdvice: Pair<String, String>? = null,
+    onClearNotificationAdvice: () -> Unit = {},
+    onForecastClick: () -> Unit,
+    onChatClick: (String?) -> Unit,
+    logout: () -> Unit
+) {
     val homeState by viewModel.homeState.collectAsState()
     val aiAdviceState by viewModel.aiAdviceState.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     var showLocationDialog by remember { mutableStateOf(false) }
     var infoDialogContent by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var activeNotificationAdvice by remember { mutableStateOf<Pair<String, String>?>(null) }
+
+    val context = LocalContext.current
+
+    LaunchedEffect(notificationAdvice) {
+        if (notificationAdvice != null) {
+            activeNotificationAdvice = notificationAdvice
+        }
+    }
 
     val aqiValue = ((homeState as? NetworkResponse.Success)?.data?.data?.aqi) ?: 0
 
@@ -66,7 +86,7 @@ fun HomeScreen(viewModel: HomeViewModel, onChatClick: () -> Unit, logout: () -> 
     }
 
     val towns = listOf("Dushanbe", "Khujand", "Bokhtar", "Kulob", "Istaravshan", "Panjakent", "Khorugh", "Tursunzoda", "Hisor")
-    var location by remember { mutableStateOf( "Dushanbe")}
+    var location by remember { mutableStateOf("Dushanbe") }
 
     LaunchedEffect(Unit, location) {
         viewModel.getCityAirData(location)
@@ -107,7 +127,15 @@ fun HomeScreen(viewModel: HomeViewModel, onChatClick: () -> Unit, logout: () -> 
                 topBar = { 
                     HomeTopBar(
                         location = location,
-                        onLocationClick = { showLocationDialog = true }
+                        onLocationClick = { showLocationDialog = true },
+                        onNotificationClick = {
+                            val currentAdvice = (aiAdviceState as? NetworkResponse.Success)?.data?.advice
+                                ?: "Air Quality in $location is $status (AQI $aqiValue). $healthAdvice"
+                            val title = "Smart Air Alert ($location)"
+                            val controller = NotificationController(context)
+                            controller.triggerFirebaseNotification(title, currentAdvice)
+                            activeNotificationAdvice = title to currentAdvice
+                        }
                     ) 
                 },
                 containerColor = Color.Transparent
@@ -143,7 +171,6 @@ fun HomeScreen(viewModel: HomeViewModel, onChatClick: () -> Unit, logout: () -> 
                             
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Large Status Text
                             Text(
                                 text = status,
                                 color = getAQIColor(aqiValue),
@@ -163,7 +190,6 @@ fun HomeScreen(viewModel: HomeViewModel, onChatClick: () -> Unit, logout: () -> 
                             
                             Spacer(modifier = Modifier.height(40.dp))
                             
-                            // SEPARATE AI ADVICE SECTION (Airi's Recommendation)
                             when (val aiState = aiAdviceState) {
                                 is NetworkResponse.Loading -> {
                                     Box(
@@ -174,17 +200,20 @@ fun HomeScreen(viewModel: HomeViewModel, onChatClick: () -> Unit, logout: () -> 
                                             .shimmerEffect()
                                     )
                                 }
-                            is NetworkResponse.Success -> {
-                                AIAdviceCard(
-                                    advice = aiState.data.advice,
-                                    onChatClick = onChatClick
-                                )
-                            }
+                                is NetworkResponse.Success -> {
+                                    AIAdviceCard(
+                                        advice = aiState.data.advice,
+                                        onChatClick = { onChatClick(aiState.data.advice) }
+                                    )
+                                }
                                 is NetworkResponse.Error -> {
-                                    Text(text = "Airi is currently unavailable", color = Color.Red.copy(alpha = 0.7f), fontSize = 12.sp)
+                                    Text(text = "AI is currently unavailable", color = Color.Red.copy(alpha = 0.7f), fontSize = 12.sp)
                                 }
                                 else -> {}
                             }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+                            ForecastPreviewCard(onClick = onForecastClick)
 
                             Spacer(modifier = Modifier.height(24.dp))
 
@@ -254,6 +283,81 @@ fun HomeScreen(viewModel: HomeViewModel, onChatClick: () -> Unit, logout: () -> 
         }
     }
 
+    if (activeNotificationAdvice != null) {
+        val (title, body) = activeNotificationAdvice!!
+        AlertDialog(
+            onDismissRequest = {
+                activeNotificationAdvice = null
+                onClearNotificationAdvice()
+            },
+            icon = {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(BackgroundElevated),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.img_ai_robot),
+                        contentDescription = null,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+            },
+            title = {
+                Text(
+                    text = title,
+                    color = AIAccent,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "AI Recommendation",
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = body,
+                        color = TextPrimary,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val currentAdvice = body
+                        activeNotificationAdvice = null
+                        onClearNotificationAdvice()
+                        onChatClick(currentAdvice)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AIAccent)
+                ) {
+                    Icon(Icons.Default.Chat, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Ask AI in Chat", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    activeNotificationAdvice = null
+                    onClearNotificationAdvice()
+                }) {
+                    Text("Dismiss", color = TextSecondary)
+                }
+            },
+            containerColor = BackgroundSecondary,
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+
     if (infoDialogContent != null) {
         AlertDialog(
             onDismissRequest = { infoDialogContent = null },
@@ -302,15 +406,68 @@ fun HomeScreen(viewModel: HomeViewModel, onChatClick: () -> Unit, logout: () -> 
     }
 }
 
+@Composable
+fun ForecastPreviewCard(onClick: () -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(1000, delayMillis = 300)) + slideInVertically(initialOffsetY = { 50 })
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(BackgroundSecondary.copy(alpha = 0.7f))
+                .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp))
+                .clickable { onClick() }
+                .padding(18.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(BackgroundElevated),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = null,
+                            tint = AIAccent,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(text = "Air Quality Forecast", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(text = "Tap to view 7 days & daily trends", color = TextSecondary, fontSize = 12.sp)
+                    }
+                }
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = TextHint
+                )
+            }
+        }
+    }
+}
+
 private fun formatDt(dt: String): String {
     return try {
-        // Assume server time is in UTC or a base time, adding 5 hours for Tajikistan
         val inputSdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
         val date = inputSdf.parse(dt)
         if (date != null) {
-            val cal = java.util.Calendar.getInstance()
+            val cal = Calendar.getInstance()
             cal.time = date
-            cal.add(java.util.Calendar.HOUR_OF_DAY, 5) // Tajikistan (UTC+5)
+            cal.add(Calendar.HOUR_OF_DAY, 5) // Tajikistan (UTC+5)
             val outputSdf = SimpleDateFormat("HH:mm", Locale.getDefault())
             "Last update: ${outputSdf.format(cal.time)}"
         } else {
@@ -329,7 +486,11 @@ data class Quadruple<out A, out B, out C, out D>(
 )
 
 @Composable
-fun HomeTopBar(location: String, onLocationClick: () -> Unit) {
+fun HomeTopBar(
+    location: String,
+    onLocationClick: () -> Unit,
+    onNotificationClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -355,7 +516,7 @@ fun HomeTopBar(location: String, onLocationClick: () -> Unit) {
             Icon(imageVector = Icons.Default.KeyboardArrowDown, contentDescription = null, tint = TextPrimary)
         }
         
-        IconButton(onClick = { }) {
+        IconButton(onClick = onNotificationClick) {
             Icon(imageVector = Icons.Default.NotificationsNone, contentDescription = "Notifications", tint = TextPrimary)
         }
     }
@@ -407,7 +568,6 @@ fun AQIGauge(aqi: Int) {
             val strokeWidth = 24.dp.toPx()
             val dashStrokeWidth = 2.dp.toPx()
 
-            // 1. Rotating background dash ring
             rotate(rotation) {
                 drawArc(
                     color = Color.White.copy(alpha = 0.05f),
@@ -421,7 +581,6 @@ fun AQIGauge(aqi: Int) {
                 )
             }
 
-            // 2. Background static arc
             drawArc(
                 color = Color.Black.copy(alpha = 0.25f),
                 startAngle = 135f,
@@ -433,7 +592,6 @@ fun AQIGauge(aqi: Int) {
                 )
             )
 
-            // 3. Dynamic Glow
             drawArc(
                 color = aqiColor.copy(alpha = glowAlpha * 0.2f),
                 startAngle = 135f,
@@ -445,7 +603,6 @@ fun AQIGauge(aqi: Int) {
                 )
             )
 
-            // 4. Progress Arc with Full scale gradient
             drawArc(
                 brush = Brush.sweepGradient(
                     0.0f to Color(0xFF22C55E),
@@ -498,7 +655,7 @@ fun InfoCard(
     label: String,
     value: String,
     unit: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     modifier: Modifier = Modifier,
     onInfoClick: () -> Unit
 ) {
@@ -546,7 +703,7 @@ fun InfoCard(
                 }
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = value, // Static text as requested
+                    text = value,
                     color = TextPrimary,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.ExtraBold

@@ -5,7 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.example.smartairmonitoring.modul.auth.User
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -22,6 +25,9 @@ class ProfileViewModel : ViewModel() {
 
     private val _profileState = MutableStateFlow<ProfileState>(ProfileState.Loading)
     val profileState = _profileState.asStateFlow()
+
+    private val _errorEvents = MutableSharedFlow<String>()
+    val errorEvents = _errorEvents.asSharedFlow()
 
     init {
         loadUserProfile()
@@ -47,12 +53,41 @@ class ProfileViewModel : ViewModel() {
 
     fun updateToggle(field: String, value: Boolean) {
         val uid = auth.currentUser?.uid ?: return
+        val currentState = _profileState.value
+        if (currentState !is ProfileState.Success) return
+
+        val originalValue = when (field) {
+            "notificationsEnabled" -> currentState.user.notificationsEnabled
+            "dailyForecastEnabled" -> currentState.user.dailyForecastEnabled
+            "healthTipsEnabled" -> currentState.user.healthTipsEnabled
+            else -> return
+        }
+
+        // Optimistically update local state
+        refreshLocalUser(field, value)
+
         viewModelScope.launch {
             try {
+                val topic = when (field) {
+                    "notificationsEnabled" -> "air_quality_alerts"
+                    "dailyForecastEnabled" -> "daily_forecast"
+                    "healthTipsEnabled" -> "health_tips"
+                    else -> throw IllegalArgumentException("Invalid field")
+                }
+
+                val messaging = FirebaseMessaging.getInstance()
+                if (value) {
+                    messaging.subscribeToTopic(topic).await()
+                } else {
+                    messaging.unsubscribeFromTopic(topic).await()
+                }
+
+                // Partial update in Firestore
                 db.collection("users").document(uid).update(field, value).await()
-                refreshLocalUser(field, value)
             } catch (e: Exception) {
-                // Handle error
+                // Revert local state and show error
+                refreshLocalUser(field, originalValue)
+                _errorEvents.emit(e.localizedMessage ?: "Failed to update notification setting")
             }
         }
     }
@@ -64,7 +99,7 @@ class ProfileViewModel : ViewModel() {
                 db.collection("users").document(uid).update(field, value).await()
                 refreshLocalUser(field, value)
             } catch (e: Exception) {
-                // Handle error
+                _errorEvents.emit(e.localizedMessage ?: "Failed to update field")
             }
         }
     }

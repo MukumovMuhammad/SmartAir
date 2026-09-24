@@ -38,9 +38,18 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AIAssistantScreen(onBackClick: () -> Unit) {
+fun AIAssistantScreen(
+    initialPrompt: String? = null,
+    onBackClick: () -> Unit
+) {
     val repository = remember { ChatRepository(RetrofitInstance.chatApi) }
     val viewModel: ChatViewModel = viewModel(factory = ChatViewModel.Factory(repository))
+    
+    LaunchedEffect(initialPrompt) {
+        if (!initialPrompt.isNullOrBlank()) {
+            viewModel.startChatWithPrompt(initialPrompt)
+        }
+    }
     
     val messagesState by viewModel.messages.collectAsState()
     val sessionsState by viewModel.sessions.collectAsState()
@@ -97,7 +106,7 @@ fun AIAssistantScreen(onBackClick: () -> Unit) {
                     title = {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                "Airi Assistant",
+                                "AI",
                                 color = TextPrimary,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
@@ -499,7 +508,7 @@ fun WelcomeChatContent(onSuggestionClick: (String) -> Unit) {
         Spacer(modifier = Modifier.height(8.dp))
         
         Text(
-            text = "Ask Airi anything about air quality, health tips, or environmental data.",
+            text = "Ask AI anything about air quality, health tips, or environmental data.",
             color = TextSecondary,
             fontSize = 15.sp,
             textAlign = TextAlign.Center,
@@ -636,7 +645,7 @@ fun ChatInputArea(onSend: (String) -> Unit, enabled: Boolean) {
             TextField(
                 value = messageText,
                 onValueChange = { messageText = it },
-                placeholder = { Text("Ask Airi anything...", color = TextHint, fontSize = 14.sp) },
+                placeholder = { Text("Ask AI anything...", color = TextHint, fontSize = 14.sp) },
                 modifier = Modifier.weight(1f),
                 enabled = enabled,
                 colors = TextFieldDefaults.colors(

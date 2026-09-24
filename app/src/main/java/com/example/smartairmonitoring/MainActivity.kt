@@ -1,6 +1,7 @@
 package com.example.smartairmonitoring
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -9,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import com.example.smartairmonitoring.modul.core.navigation.AppNavigation
 import com.example.smartairmonitoring.ui.theme.SmartAirMonitoringTheme
@@ -17,7 +19,15 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
 
+data class NotificationIntentData(
+    val topic: String,
+    val title: String,
+    val body: String
+)
+
 class MainActivity : ComponentActivity() {
+
+    private val notificationIntentState = mutableStateOf<NotificationIntentData?>(null)
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -46,7 +56,6 @@ class MainActivity : ComponentActivity() {
         val db = FirebaseFirestore.getInstance()
         val userRef = db.collection("users").document(currentUser.uid)
 
-        // Also fetch and update FIAM installation ID
         FirebaseInstallations.getInstance().id.addOnSuccessListener { fiamId ->
             if (!fiamId.isNullOrEmpty()) {
                 userRef.update("fiamToken", fiamId)
@@ -83,9 +92,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-
+        handleNotificationIntent(intent)
         askNotificationPermission()
+        enableEdgeToEdge()
 
         FirebaseAuth.getInstance().addAuthStateListener { auth ->
             if (auth.currentUser != null) {
@@ -108,8 +117,28 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             SmartAirMonitoringTheme {
-                AppNavigation()
+                AppNavigation(
+                    notificationData = notificationIntentState.value,
+                    onClearNotificationData = { notificationIntentState.value = null }
+                )
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNotificationIntent(intent)
+    }
+
+    private fun handleNotificationIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra("EXTRA_SHOW_ADVICE_DETAIL", false) == true) {
+            val topic = intent.getStringExtra("EXTRA_NOTIFICATION_TOPIC") ?: "air_quality_alerts"
+            val title = intent.getStringExtra("EXTRA_ADVICE_TITLE") ?: "Smart Air Quality Alert"
+            val body = intent.getStringExtra("EXTRA_ADVICE_DETAILS")
+                ?: intent.getStringExtra("EXTRA_ADVICE_BODY")
+                ?: "AI Health Recommendation available."
+            notificationIntentState.value = NotificationIntentData(topic, title, body)
         }
     }
 }

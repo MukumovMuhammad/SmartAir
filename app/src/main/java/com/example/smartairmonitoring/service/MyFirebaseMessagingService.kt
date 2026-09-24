@@ -28,10 +28,18 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
 
-        val title = remoteMessage.notification?.title ?: "Smart Air Alert"
-        val body = remoteMessage.notification?.body ?: "New air quality update available."
+        val title = remoteMessage.notification?.title 
+            ?: remoteMessage.data["title"] 
+            ?: "Smart Air Alert"
+
+        val body = remoteMessage.notification?.body 
+            ?: remoteMessage.data["body"] 
+            ?: "New update available."
+
+        val topic = remoteMessage.data["topic"] ?: "air_quality_alerts"
+        val adviceDetails = remoteMessage.data["advice_details"] ?: body
 
         val notificationController = NotificationController(applicationContext)
-        notificationController.triggerFirebaseNotification(title, body)
+        notificationController.triggerFirebaseNotification(title, body, topic, adviceDetails)
     }
 }
