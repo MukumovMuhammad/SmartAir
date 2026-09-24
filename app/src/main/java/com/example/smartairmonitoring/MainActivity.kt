@@ -14,6 +14,7 @@ import com.example.smartairmonitoring.modul.core.navigation.AppNavigation
 import com.example.smartairmonitoring.ui.theme.SmartAirMonitoringTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
 
 class MainActivity : ComponentActivity() {
@@ -44,6 +45,13 @@ class MainActivity : ComponentActivity() {
         val currentUser = FirebaseAuth.getInstance().currentUser ?: return
         val db = FirebaseFirestore.getInstance()
         val userRef = db.collection("users").document(currentUser.uid)
+
+        // Also fetch and update FIAM installation ID
+        FirebaseInstallations.getInstance().id.addOnSuccessListener { fiamId ->
+            if (!fiamId.isNullOrEmpty()) {
+                userRef.update("fiamToken", fiamId)
+            }
+        }
 
         if (isGranted) {
             FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
@@ -82,6 +90,19 @@ class MainActivity : ComponentActivity() {
         FirebaseAuth.getInstance().addAuthStateListener { auth ->
             if (auth.currentUser != null) {
                 askNotificationPermission()
+            }
+        }
+
+        FirebaseInstallations.getInstance().id.addOnSuccessListener { id ->
+            Log.d("FIAM_TEST_TAG", "Installation ID: $id")
+            val currentUser = FirebaseAuth.getInstance().currentUser
+            if (currentUser != null) {
+                FirebaseFirestore.getInstance().collection("users")
+                    .document(currentUser.uid)
+                    .update("fiamToken", id)
+                    .addOnSuccessListener {
+                        Log.d("FIAM", "FIAM installation ID updated in Firestore")
+                    }
             }
         }
 

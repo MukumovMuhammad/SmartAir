@@ -13,5 +13,6 @@ data class User(
     val notificationsEnabled: Boolean = true,
     val dailyForecastEnabled: Boolean = true,
     val healthTipsEnabled: Boolean = false,
-    val fcmToken: String = ""
+    val fcmToken: String = "",
+    val fiamToken: String = ""
 )

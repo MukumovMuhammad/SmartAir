@@ -17,6 +17,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -67,12 +68,19 @@ class AuthViewModel : ViewModel() {
                         "0"
                     }
 
+                    val fiamToken = try {
+                        FirebaseInstallations.getInstance().id.await()
+                    } catch (_: Exception) {
+                        "0"
+                    }
+
                     val user = User(
                         uid = firebaseUser.uid,
                         email = email,
                         firstName = "", // Empty to trigger completion check
                         surname = "",
-                        fcmToken = fcmToken ?: "0"
+                        fcmToken = fcmToken ?: "0",
+                        fiamToken = fiamToken ?: "0"
                     )
 
                     db.collection("users")
@@ -138,11 +146,15 @@ class AuthViewModel : ViewModel() {
     private suspend fun syncFcmToken(uid: String) {
         try {
             val token = FirebaseMessaging.getInstance().token.await()
-            if (!token.isNullOrEmpty()) {
-                db.collection("users").document(uid).update("fcmToken", token).await()
+            val fiamId = FirebaseInstallations.getInstance().id.await()
+            val updates = mutableMapOf<String, Any>()
+            if (!token.isNullOrEmpty()) updates["fcmToken"] = token
+            if (!fiamId.isNullOrEmpty()) updates["fiamToken"] = fiamId
+            if (updates.isNotEmpty()) {
+                db.collection("users").document(uid).update(updates).await()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync FCM token", e)
+            Log.e(TAG, "Failed to sync tokens", e)
         }
     }
 
