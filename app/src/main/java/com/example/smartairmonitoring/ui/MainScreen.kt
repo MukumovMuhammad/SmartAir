@@ -201,6 +201,8 @@ fun MainScreen(
             composable(Screen.AIAssistant.route) {
                 AIAssistantScreen(
                     initialPrompt = initialChatPrompt,
+                    onPromptConsumed = { initialChatPrompt = null },
+                    onRequireAuth = onLogout,
                     onBackClick = { navController.popBackStack() }
                 )
             }

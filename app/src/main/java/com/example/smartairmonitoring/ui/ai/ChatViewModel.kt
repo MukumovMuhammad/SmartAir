@@ -10,15 +10,58 @@ import com.example.smartairmonitoring.Data.repository.ChatRepository
 import com.example.smartairmonitoring.modul.core.network.NetworkResponse
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+enum class ChatMode {
+    ONLINE,
+    OFFLINE
+}
+
+data class OfflineModelInfo(
+    val name: String = "Gemma 4 2B (Int4)",
+    val size: String = "1.8 GB",
+    val isDownloaded: Boolean = false,
+    val isDownloading: Boolean = false,
+    val downloadProgress: Float = 0f
+)
+
 class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
 
     private val tag = "ChatViewModel_TAG"
     private val auth = FirebaseAuth.getInstance()
+
+    // CHAT MODE & OFFLINE MODEL
+    private val _chatMode = MutableStateFlow(ChatMode.ONLINE)
+    val chatMode = _chatMode.asStateFlow()
+
+    private val _offlineModel = MutableStateFlow(OfflineModelInfo())
+    val offlineModel = _offlineModel.asStateFlow()
+
+    fun selectMode(mode: ChatMode) {
+        if (mode == ChatMode.OFFLINE && !_offlineModel.value.isDownloaded) {
+            return
+        }
+        _chatMode.value = mode
+    }
+
+    fun startModelDownload() {
+        if (_offlineModel.value.isDownloading || _offlineModel.value.isDownloaded) return
+
+        viewModelScope.launch {
+            _offlineModel.update { it.copy(isDownloading = true, downloadProgress = 0f) }
+            for (i in 1..10) {
+                delay(300)
+                _offlineModel.update { it.copy(downloadProgress = i / 10f) }
+            }
+            _offlineModel.update { 
+                it.copy(isDownloading = false, isDownloaded = true, downloadProgress = 1f) 
+            }
+        }
+    }
 
     // SESSION LIST
     private val _sessions =
@@ -83,6 +126,17 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
         }
     }
 
+    // GUEST / AUTH CHECK
+    val isGuest: Boolean
+        get() = auth.currentUser == null || auth.currentUser?.isAnonymous == true
+
+    private val _showGuestDialog = MutableStateFlow(false)
+    val showGuestDialog = _showGuestDialog.asStateFlow()
+
+    fun dismissGuestDialog() {
+        _showGuestDialog.value = false
+    }
+
     private var handledPrompt: String? = null
 
     // ---------------------------------------------------
@@ -95,10 +149,31 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
     }
 
     fun startChatWithPrompt(prompt: String) {
-        if (prompt.isBlank() || handledPrompt == prompt) return
-        handledPrompt = prompt
+        if (prompt.isBlank()) return
+        if (isGuest) {
+            _showGuestDialog.value = true
+            return
+        }
         startNewChat()
         sendMessage(prompt)
+    }
+
+    private var lastAttemptedMessage: String? = null
+
+    fun retry() {
+        val session = _currentSession.value
+        val id = getId(session?.chat_id)
+
+        if (id != null) {
+            _messages.value = NetworkResponse.Loading
+            fetchMessages(id)
+        } else if (!lastAttemptedMessage.isNullOrBlank()) {
+            val text = lastAttemptedMessage!!
+            lastAttemptedMessage = null
+            sendMessage(text)
+        } else {
+            fetchSessions()
+        }
     }
 
     // ---------------------------------------------------
@@ -120,6 +195,13 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
 
         Log.d("chat_TAG", "sending message $text")
         if (text.isBlank()) return
+
+        if (isGuest) {
+            _showGuestDialog.value = true
+            return
+        }
+
+        lastAttemptedMessage = text
 
         val session = _currentSession.value
         val sessionId = getId(session?.chat_id)
