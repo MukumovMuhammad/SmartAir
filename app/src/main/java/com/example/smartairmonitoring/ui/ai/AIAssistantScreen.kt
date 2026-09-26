@@ -554,18 +554,56 @@ fun ChatHistoryDrawerContent(
                                         )
                                     }
 
-                                    Row {
+                                    Box {
+                                        var menuExpanded by remember { mutableStateOf(false) }
+
                                         IconButton(
-                                            onClick = { onRenameSession(session) },
-                                            modifier = Modifier.size(24.dp)
+                                            onClick = { menuExpanded = true },
+                                            modifier = Modifier.size(28.dp)
                                         ) {
-                                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextHint, modifier = Modifier.size(14.dp))
+                                            Icon(
+                                                imageVector = Icons.Default.MoreVert,
+                                                contentDescription = "Options",
+                                                tint = TextHint,
+                                                modifier = Modifier.size(18.dp)
+                                            )
                                         }
-                                        IconButton(
-                                            onClick = { session.chat_id?.let { onDeleteSession(it) } },
-                                            modifier = Modifier.size(24.dp)
+
+                                        DropdownMenu(
+                                            expanded = menuExpanded,
+                                            onDismissRequest = { menuExpanded = false },
+                                            modifier = Modifier.background(BackgroundSecondary)
                                         ) {
-                                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = TextHint, modifier = Modifier.size(14.dp))
+                                            DropdownMenuItem(
+                                                text = { Text("Rename", color = TextPrimary, fontSize = 13.sp) },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Edit,
+                                                        contentDescription = "Rename",
+                                                        tint = AIAccent,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                },
+                                                onClick = {
+                                                    menuExpanded = false
+                                                    onRenameSession(session)
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Delete", color = Color(0xFFEF4444), fontSize = 13.sp) },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Delete,
+                                                        contentDescription = "Delete",
+                                                        tint = Color(0xFFEF4444),
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                },
+                                                onClick = {
+                                                    menuExpanded = false
+                                                    session.chat_id?.let { onDeleteSession(it) }
+                                                }
+                                            )
                                         }
                                     }
                                 }
