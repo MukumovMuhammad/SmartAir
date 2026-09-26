@@ -9,8 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -283,6 +282,7 @@ fun ProfileContent(
     onLogout: () -> Unit
 ) {
     var showEditDialog by remember { mutableStateOf<Pair<String, String>?>(null) } // fieldName, currentVal
+    var showAboutDialog by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
 
     val ageGroups = listOf("Under 18", "18 - 24", "25 - 34", "35 - 44", "45 - 54", "55 - 64", "65+")
@@ -362,13 +362,11 @@ fun ProfileContent(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column {
-                AboutItem("About SmartAir") {
-                    Toast.makeText(context, "SmartAir v1.0 - Your Air Quality Companion", Toast.LENGTH_SHORT).show()
-                }
+                AboutItem("About SmartAir") { showAboutDialog = "about" }
                 HorizontalDivider(color = BackgroundElevated, thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 16.dp))
-                AboutItem("Privacy Policy") { }
+                AboutItem("Privacy Policy") { showAboutDialog = "privacy" }
                 HorizontalDivider(color = BackgroundElevated, thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 16.dp))
-                AboutItem("Terms of Use") { }
+                AboutItem("Terms of Use") { showAboutDialog = "terms" }
             }
         }
 
@@ -383,6 +381,96 @@ fun ProfileContent(
         
         Spacer(modifier = Modifier.height(40.dp))
     }
+
+    // Modal Popup Dialog for About / Privacy Policy / Terms of Use
+    showAboutDialog?.let { type ->
+        val (title, content) = when (type) {
+            "about" -> "About SmartAir" to """
+                SmartAir v1.0.0 • Powered by Gemma 4
+                
+                SmartAir is your intelligent, real-time air quality monitoring companion.
+                
+                Key Features:
+                • Real-time AQI tracking and pollutant breakdown (PM2.5, PM10, O3).
+                • 7-Day Air Quality Forecast & daily trend analysis.
+                • Interactive Air Quality Map covering cities in Tajikistan.
+                • AI Health Recommendations powered by Gemma 4.
+                • Customizable FCM topic alerts for Air Quality, Forecast, and Health Tips.
+                
+                Our mission is to empower you with accurate environmental insights to protect your health every day.
+            """.trimIndent()
+
+            "privacy" -> "Privacy Policy" to """
+                SmartAir Privacy Policy (Updated Sep 2026)
+                
+                1. Information We Collect:
+                • Account Info: Email, profile details stored securely in Firebase.
+                • Device Tokens: FCM registration token for topic alerts.
+                • Preferences: Selected city for local air pollution data.
+                
+                2. How We Use Information:
+                • To provide personalized air quality forecasts and AI health advice.
+                • To send notifications if enabled in your settings.
+                
+                3. Data Protection:
+                • We do not sell or share your personal information with third parties.
+                • All communications are encrypted using HTTPS and Firebase Security.
+            """.trimIndent()
+
+            "terms" -> "Terms of Use" to """
+                SmartAir Terms of Service (Updated Sep 2026)
+                
+                1. Acceptance of Terms:
+                By using SmartAir, you agree to these terms of service.
+                
+                2. Health Disclaimer:
+                • Air quality metrics and AI advice are provided for informational purposes only.
+                • AI recommendations are not a substitute for professional medical advice.
+                
+                3. Account & Service:
+                • You are responsible for maintaining your account credentials.
+                • We continuously update SmartAir to improve forecasting accuracy and features.
+            """.trimIndent()
+
+            else -> "" to ""
+        }
+
+        AlertDialog(
+            onDismissRequest = { showAboutDialog = null },
+            icon = {
+                Icon(
+                    imageVector = when (type) {
+                        "about" -> Icons.Default.Info
+                        "privacy" -> Icons.Default.Security
+                        else -> Icons.Default.Description
+                    },
+                    contentDescription = null,
+                    tint = AIAccent,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = { Text(title, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text(
+                        text = content,
+                        color = TextSecondary,
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAboutDialog = null }) {
+                    Text("Close", color = AIAccent, fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = BackgroundSecondary,
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+
+    // Generic Edit Dialog
 
     // Generic Edit Dialog
     showEditDialog?.let { (field, currentVal) ->
